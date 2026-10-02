@@ -1,0 +1,113 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Users collection: users can read and write their own profile
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create, update: if isOwner(userId);
+      allow delete: if false;
+    }
+
+    // Courses: published courses readable by all or signed-in users; mentors can manage their own courses
+    match /courses/{courseId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (resource.data.mentorId == request.auth.uid || request.auth.token.email == "karthikeyaprabhala2005@gmail.com");
+    }
+
+    // Modules
+    match /modules/{moduleId} {
+      allow read: if true;
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // Lessons
+    match /lessons/{lessonId} {
+      allow read: if true;
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // AI Summaries
+    match /aiSummaries/{summaryId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // Enrollments
+    match /enrollments/{enrollmentId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (resource.data.studentId == request.auth.uid);
+      allow delete: if false;
+    }
+
+    // Course Access Keys
+    match /courseAccessKeys/{keyId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // Tests
+    match /tests/{testId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // Test Attempts
+    match /testAttempts/{attemptId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if false;
+    }
+
+    // Assignments
+    match /assignments/{assignmentId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // Submissions
+    match /submissions/{submissionId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if false;
+    }
+
+    // Progress
+    match /progress/{progressId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if false;
+    }
+
+    // Google Meet Live Sessions
+    match /meetSessions/{sessionId} {
+      allow read: if true;
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // Connection test document
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+  }
+}

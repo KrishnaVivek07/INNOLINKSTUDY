@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0f1d" />
+      <stop offset="50%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+    <linearGradient id="cyan-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+    <linearGradient id="emerald-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="url(#bg-grad)" />
+
+  <!-- Circuit traces -->
+  <g stroke="#1e293b" stroke-width="4" fill="none">
+    <path d="M64 128 h80 l48 48 v64" />
+    <path d="M448 128 h-80 l-48 48 v64" />
+    <path d="M64 384 h80 l48 -48 v-64" />
+    <path d="M448 384 h-80 l-48 -48 v-64" />
+    <circle cx="64" cy="128" r="8" fill="#1e293b" />
+    <circle cx="448" cy="128" r="8" fill="#1e293b" />
+    <circle cx="64" cy="384" r="8" fill="#1e293b" />
+    <circle cx="448" cy="384" r="8" fill="#1e293b" />
+  </g>
+
+  <!-- Active glowing circuit paths -->
+  <g stroke="url(#cyan-glow)" stroke-width="6" stroke-linecap="round" fill="none" filter="url(#glow)">
+    <path d="M160 256 h40 l32 -48 h48" />
+    <path d="M352 256 h-40 l-32 48 h-48" />
+    <circle cx="160" cy="256" r="7" fill="#38bdf8" />
+    <circle cx="352" cy="256" r="7" fill="#38bdf8" />
+  </g>
+
+  <!-- Central Chip Body -->
+  <rect x="176" y="176" width="160" height="160" rx="32" fill="#0f172a" stroke="url(#cyan-glow)" stroke-width="6" filter="url(#glow)" />
+  
+  <!-- Chip Pins -->
+  <g fill="#38bdf8">
+    <rect x="208" y="160" width="16" height="16" rx="4" />
+    <rect x="248" y="160" width="16" height="16" rx="4" />
+    <rect x="288" y="160" width="16" height="16" rx="4" />
+
+    <rect x="208" y="336" width="16" height="16" rx="4" />
+    <rect x="248" y="336" width="16" height="16" rx="4" />
+    <rect x="288" y="336" width="16" height="16" rx="4" />
+
+    <rect x="160" y="208" width="16" height="16" rx="4" />
+    <rect x="160" y="248" width="16" height="16" rx="4" />
+    <rect x="160" y="288" width="16" height="16" rx="4" />
+
+    <rect x="336" y="208" width="16" height="16" rx="4" />
+    <rect x="336" y="248" width="16" height="16" rx="4" />
+    <rect x="336" y="288" width="16" height="16" rx="4" />
+  </g>
+
+  <!-- Stylized "InnoLink" Icon Logo -->
+  <path d="M226 216 h60 M256 216 v80 M226 296 h60" stroke="#f8fafc" stroke-width="12" stroke-linecap="round" fill="none" />
+  <circle cx="256" cy="256" r="10" fill="url(#emerald-glow)" filter="url(#glow)" />
+</svg>

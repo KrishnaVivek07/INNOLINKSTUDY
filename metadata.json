@@ -1,0 +1,6 @@
+{
+  "name": "InnoLink Technologies",
+  "description": "Premier electronics and technology learning management system and progressive web app powered by MK Solutions. Learn, build, test, and innovate.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

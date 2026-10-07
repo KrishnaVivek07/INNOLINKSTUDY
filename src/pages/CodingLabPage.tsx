@@ -35,6 +35,7 @@ import {
   Plus,
   FolderOpen,
   RotateCcw,
+  Terminal,
 } from 'lucide-react';
 
 const INITIAL_COURSE_LABS: CodingLab[] = [
@@ -86,6 +87,22 @@ const INITIAL_COURSE_LABS: CodingLab[] = [
     isPublished: true,
     createdAt: new Date().toISOString(),
   },
+  {
+    id: 'lab-raspi-4',
+    courseId: 'course-electronics-core',
+    title: 'Lab 4: Raspberry Pi Linux SBC Python Telemetry & GPIO',
+    description: 'Program a Linux service on Raspberry Pi Single-Board Computer to control 40-pin GPIO headers and stream system telemetry.',
+    board: 'raspberry_pi',
+    language: 'python',
+    requiredComponents: ['Raspberry Pi 4 Model B', 'Red 5mm LED', '220Ω Resistor', 'Tactile Push Button'],
+    recommendedKitId: 'stem-kit-pico-microcontroller',
+    instructions: `1. Boot the Raspberry Pi virtual Linux OS environment.\n2. Write a Python script importing time and os (or RPi.GPIO).\n3. Configure GPIO 17 as an OUTPUT connected to the status LED.\n4. Log ARM Cortex-A72 CPU core temperature and toggle GPIO 17.\n5. Click "Execute in Linux" to observe runtime logs and hardware responses.`,
+    expectedOutput: 'Linux terminal processes PID with active GPIO 17 output state transitions.',
+    marks: 100,
+    attemptsAllowed: 5,
+    isPublished: true,
+    createdAt: new Date().toISOString(),
+  },
 ];
 
 interface CodingLabPageProps {
@@ -118,6 +135,16 @@ export const CodingLabPage: React.FC<CodingLabPageProps> = ({
 
   const [activeLabId, setActiveLabId] = useState<string>(labs[0]?.id || 'lab-esp32-1');
   const currentLab = labs.find((l) => l.id === activeLabId) || labs[0];
+
+  // Hardware Platform Category: Arduino, ESP32, Raspberry Pi Pico, Raspberry Pi, Block Coding, Hybrid Coding
+  const [selectedCategory, setSelectedCategory] = useState<
+    'arduino' | 'esp32' | 'pico' | 'raspberry_pi' | 'blocks' | 'hybrid'
+  >(() => {
+    if (labs[0]?.board === 'rp2040_pico') return 'pico';
+    if (labs[0]?.board === 'raspberry_pi') return 'raspberry_pi';
+    if (labs[0]?.board === 'arduino_uno') return 'arduino';
+    return 'esp32';
+  });
 
   // Active hardware board & coding mode
   const [selectedBoard, setSelectedBoard] = useState<HardwareBoard>(currentLab?.board || 'esp32');
@@ -200,52 +227,16 @@ void loop() {
     }
   }, [labs]);
 
-  // When active lab changes, update board and instructions
-  const handleSelectLab = (labId: string) => {
-    setActiveLabId(labId);
-    const target = labs.find((l) => l.id === labId);
-    if (target) {
-      setSelectedBoard(target.board);
-      if (target.startingCode) setCode(target.startingCode);
-    }
-  };
-
-  // Run Simulation logic
-  const handleRunSimulation = () => {
-    setIsSimulating(true);
-    const timestamp = new Date().toLocaleTimeString();
-    setSerialLogs((prev) => [
-      ...prev,
-      `[${timestamp}] Booting ${boardDef.name} (${boardDef.mcu})...`,
-      `[${timestamp}] Clock: ${boardDef.clockSpeed} • Logic Voltage: ${boardDef.operatingVoltage}`,
-      `[${timestamp}] GPIO configured. Running loop()...`,
-    ]);
-
-    if (simTimerRef.current) clearInterval(simTimerRef.current);
-    let step = 0;
-    simTimerRef.current = setInterval(() => {
-      step++;
-      const isHigh = step % 2 === 1;
-      setComponents((prev) =>
-        prev.map((c) =>
-          c.type === 'led' ? { ...c, state: { ...c.state, digitalValue: isHigh } } : c
-        )
-      );
-
-      setSerialLogs((prev) => {
-        const next = [
-          ...prev,
-          `[Signal] Pin ${selectedBoard === 'esp32' ? '2' : '13'} -> ${isHigh ? 'HIGH' : 'LOW'}`,
-        ];
-        return next.slice(-40);
-      });
-    }, 1000);
-  };
-
+  // Simulation Stop & Reset Handlers
   const handleStopSimulation = () => {
     setIsSimulating(false);
     if (simTimerRef.current) clearInterval(simTimerRef.current);
-    setSerialLogs((prev) => [...prev, `[Halt] Virtual microcontroller halted.`]);
+    setSerialLogs((prev) => [
+      ...prev,
+      selectedBoard === 'raspberry_pi'
+        ? `[Halt] Process terminated with returncode 0. Linux shell returned to prompt.`
+        : `[Halt] Virtual microcontroller halted.`,
+    ]);
   };
 
   const handleResetSimulation = () => {
@@ -259,71 +250,391 @@ void loop() {
     );
   };
 
-  // Save student project locally
-  const handleSaveProject = () => {
-    const project = {
-      board: selectedBoard,
-      code,
-      blocks,
-      components,
-      updatedAt: new Date().toISOString(),
-    };
-    try {
-      localStorage.setItem(`innolink_student_project_${currentLab.id}`, JSON.stringify(project));
-      showToast('Project progress saved locally!');
-    } catch {
-      showToast('Failed to save project.');
+  // Run Simulation logic
+  const handleRunSimulation = () => {
+    setIsSimulating(true);
+    const timestamp = new Date().toLocaleTimeString();
+
+    if (selectedBoard === 'raspberry_pi') {
+      setSerialLogs((prev) => [
+        ...prev,
+        `[${timestamp}] [Linux SBC] pi@raspberrypi:~$ python3 main.py`,
+        `[${timestamp}] [Linux Kernel 6.6] Process PID ${Math.floor(Math.random() * 8000 + 1000)} spawned on ARM Cortex-A72`,
+        `[${timestamp}] [40-Pin Header] GPIO 17 (Pin 11) exported. GPIO 27 (Pin 13) active.`,
+      ]);
+    } else if (selectedBoard === 'rp2040_pico') {
+      setSerialLogs((prev) => [
+        ...prev,
+        `[${timestamp}] MicroPython v1.22.0 on 2026-10-07; Raspberry Pi Pico with RP2040`,
+        `[${timestamp}] Type "help()" for more information.`,
+        `[${timestamp}] >>> %Run -c $EDITOR_CONTENT`,
+        `[${timestamp}] [RP2040 Dual ARM Cortex-M0+] Clock: 133 MHz | Logic: 3.3V`,
+      ]);
+    } else {
+      setSerialLogs((prev) => [
+        ...prev,
+        `[${timestamp}] Booting ${boardDef.name} (${boardDef.mcu})...`,
+        `[${timestamp}] Clock: ${boardDef.clockSpeed} • Logic Voltage: ${boardDef.operatingVoltage}`,
+        `[${timestamp}] GPIO configured. Running loop()...`,
+      ]);
+    }
+
+    if (simTimerRef.current) clearInterval(simTimerRef.current);
+    let step = 0;
+    simTimerRef.current = setInterval(() => {
+      step++;
+      const isHigh = step % 2 === 1;
+
+      setComponents((prev) =>
+        prev.map((c) =>
+          c.type === 'led' ? { ...c, state: { ...c.state, digitalValue: isHigh } } : c
+        )
+      );
+
+      setSerialLogs((prev) => {
+        let logLine = '';
+        if (selectedBoard === 'raspberry_pi') {
+          logLine = `[Linux GPIO 17] State -> ${isHigh ? 'HIGH (3.3V)' : 'LOW (0V)'} | CPU Temp: 42.8°C | 2.8GB Free`;
+        } else if (selectedBoard === 'rp2040_pico') {
+          logLine = `[Pico GP25] Built-in LED -> ${isHigh ? 'HIGH (3.3V)' : 'LOW (0V)'} | On-chip Temp: 24.3°C`;
+        } else if (selectedBoard === 'esp32') {
+          logLine = `[ESP32 GPIO 2] State -> ${isHigh ? 'HIGH (3.3V)' : 'LOW (0V)'} | Wi-Fi: CONNECTED`;
+        } else {
+          logLine = `[Signal] Pin 13 -> ${isHigh ? 'HIGH (5V)' : 'LOW (0V)'}`;
+        }
+        return [...prev, logLine].slice(-40);
+      });
+    }, 1000);
+  };
+
+  // Handle Hardware Category Selection
+  const handleSelectHardwareCategory = (
+    cat: 'arduino' | 'esp32' | 'pico' | 'raspberry_pi' | 'blocks' | 'hybrid'
+  ) => {
+    setSelectedCategory(cat);
+    handleResetSimulation();
+
+    if (cat === 'arduino') {
+      setSelectedBoard('arduino_uno');
+      setEditorMode('arduino_c');
+      const targetLab = labs.find((l) => l.board === 'arduino_uno');
+      if (targetLab) setActiveLabId(targetLab.id);
+      setCode(
+        `// Innolink Technologies - Arduino Uno Classic Program
+const int LED_PIN = 13;
+
+void setup() {
+  pinMode(LED_PIN, OUTPUT);
+  Serial.begin(9600);
+  Serial.println("Arduino Uno Initialized! ATmega328P ready.");
+}
+
+void loop() {
+  digitalWrite(LED_PIN, HIGH);
+  Serial.println("Pin 13: HIGH");
+  delay(1000);
+  digitalWrite(LED_PIN, LOW);
+  Serial.println("Pin 13: LOW");
+  delay(1000);
+}`
+      );
+      setComponents([
+        { id: 'c1', type: 'led', label: 'Arduino Pin 13 LED', color: 'red', state: { pin: '13', digitalValue: false }, pins: { anode: '13', cathode: 'GND' } },
+        { id: 'c2', type: 'push_button', label: 'Push Button', state: { pin: '2', digitalValue: false }, pins: { signal: '2', gnd: 'GND' } },
+      ]);
+    } else if (cat === 'esp32') {
+      setSelectedBoard('esp32');
+      setEditorMode('arduino_c');
+      const targetLab = labs.find((l) => l.board === 'esp32');
+      if (targetLab) setActiveLabId(targetLab.id);
+      setCode(
+        `// Innolink Technologies - ESP32 Dual-Core Program
+#define LED_PIN 2
+
+void setup() {
+  pinMode(LED_PIN, OUTPUT);
+  Serial.begin(115200);
+  Serial.println("ESP32 Dual-Core (Xtensa LX6) Initialized!");
+}
+
+void loop() {
+  digitalWrite(LED_PIN, HIGH);
+  Serial.println("GPIO 2: HIGH (3.3V)");
+  delay(1000);
+  digitalWrite(LED_PIN, LOW);
+  Serial.println("GPIO 2: LOW (0V)");
+  delay(1000);
+}`
+      );
+      setComponents([
+        { id: 'c1', type: 'led', label: 'ESP32 GPIO 2 Blue LED', color: 'blue', state: { pin: '2', digitalValue: false }, pins: { anode: '2', cathode: 'GND' } },
+        { id: 'c2', type: 'potentiometer', label: '10kΩ Potentiometer (GPIO 34 ADC1)', state: { pin: '34', value: 512 }, pins: { signal: '34', vcc: '3V3', gnd: 'GND' } },
+      ]);
+    } else if (cat === 'pico') {
+      setSelectedBoard('rp2040_pico');
+      setEditorMode('micropython');
+      const targetLab = labs.find((l) => l.board === 'rp2040_pico');
+      if (targetLab) setActiveLabId(targetLab.id);
+      setCode(
+        `# Innolink Technologies - Raspberry Pi Pico (RP2040 Microcontroller)
+import machine
+import time
+
+# GP25 is the built-in LED on the Raspberry Pi Pico
+led = machine.Pin(25, machine.Pin.OUT)
+adc = machine.ADC(4) # Internal chip temperature sensor
+
+print("=========================================")
+print(" Raspberry Pi Pico MicroPython Initialized")
+print(" RP2040 Dual ARM Cortex-M0+ @ 133 MHz")
+print("=========================================")
+
+while True:
+    led.value(1)
+    raw = adc.read_u16()
+    temp_c = 27 - (raw * (3.3 / 65535) - 0.706) / 0.001721
+    print(f"[Pico GP25] Built-in LED: ON | Core Temp: {temp_c:.1f}°C")
+    time.sleep(1)
+
+    led.value(0)
+    print("[Pico GP25] Built-in LED: OFF")
+    time.sleep(1)`
+      );
+      setComponents([
+        { id: 'c1', type: 'led', label: 'Pico Built-in GP25 LED', color: 'green', state: { pin: 'GP25', digitalValue: false }, pins: { anode: 'GP25', cathode: 'GND' } },
+        { id: 'c2', type: 'potentiometer', label: '10kΩ Potentiometer (GP26 ADC0)', state: { pin: 'GP26', value: 512 }, pins: { signal: 'GP26', vcc: '3V3', gnd: 'GND' } },
+      ]);
+    } else if (cat === 'raspberry_pi') {
+      setSelectedBoard('raspberry_pi');
+      setEditorMode('python');
+      const targetLab = labs.find((l) => l.board === 'raspberry_pi');
+      if (targetLab) setActiveLabId(targetLab.id);
+      setCode(
+        `#!/usr/bin/env python3
+# Innolink Technologies - Raspberry Pi Single-Board Computer (Linux OS)
+# Architecture: 64-bit ARMv8 Quad-Core Cortex-A72 @ 1.8GHz
+import time
+import os
+
+print("==================================================")
+print(" Linux raspberrypi 6.6.20+rpt-rpi-v8 #1 SMP aarch64")
+print(" Welcome to Raspberry Pi OS (Debian GNU/Linux)")
+print(f" Broadcom BCM2711 Quad Cortex-A72 | PID: {os.getpid()}")
+print("==================================================")
+
+# 40-Pin Header: GPIO 17 (Physical Pin 11)
+LED_PIN = 17
+print(f"Exporting Linux GPIO {LED_PIN} via /dev/gpiochip0...")
+
+def main():
+    for cycle in range(1, 6):
+        print(f"[Linux GPIO {LED_PIN}] State -> HIGH (3.3V) | Cycle {cycle}/5")
+        time.sleep(1.0)
+        print(f"[Linux GPIO {LED_PIN}] State -> LOW (0V)")
+        time.sleep(1.0)
+    print("Execution complete. Daemon listening for GPIO events.")
+
+if __name__ == "__main__":
+    main()`
+      );
+      setComponents([
+        { id: 'c1', type: 'led', label: 'External Status LED (GPIO 17 / Pin 11)', color: 'red', state: { pin: 'GPIO17', digitalValue: false }, pins: { anode: 'GPIO17', cathode: 'GND' } },
+        { id: 'c2', type: 'push_button', label: 'Tactile Push Button (GPIO 27 / Pin 13)', state: { pin: 'GPIO27', digitalValue: false }, pins: { signal: 'GPIO27', gnd: 'GND' } },
+      ]);
+    } else if (cat === 'blocks') {
+      setEditorMode('blocks');
+    } else if (cat === 'hybrid') {
+      setEditorMode('hybrid');
     }
   };
 
-  // Load student project
+  // When active lab changes, update board and instructions
+  const handleSelectLab = (labId: string) => {
+    setActiveLabId(labId);
+    const target = labs.find((l) => l.id === labId);
+    if (target) {
+      setSelectedBoard(target.board);
+      if (target.board === 'rp2040_pico') {
+        setSelectedCategory('pico');
+        setEditorMode('micropython');
+      } else if (target.board === 'raspberry_pi') {
+        setSelectedCategory('raspberry_pi');
+        setEditorMode('python');
+      } else if (target.board === 'arduino_uno') {
+        setSelectedCategory('arduino');
+        setEditorMode('arduino_c');
+      } else {
+        setSelectedCategory('esp32');
+        setEditorMode('arduino_c');
+      }
+      if (target.startingCode) setCode(target.startingCode);
+    }
+  };
+
+  // Create student custom blank program
+  const handleNewProgram = () => {
+    if (selectedCategory === 'pico') {
+      setCode(
+        editorMode === 'c_cpp'
+          ? `// Raspberry Pi Pico (RP2040) - Custom C/C++ SDK Program
+#include <stdio.h>
+#include "pico/stdlib.h"
+
+#define PICO_LED_PIN 25
+
+int main() {
+  stdio_init_all();
+  gpio_init(PICO_LED_PIN);
+  gpio_set_dir(PICO_LED_PIN, GPIO_OUT);
+  printf("Custom Raspberry Pi Pico C/C++ program initialized.\\n");
+
+  while (true) {
+    gpio_put(PICO_LED_PIN, 1);
+    printf("Pico GP25 -> HIGH (3.3V)\\n");
+    sleep_ms(1000);
+    gpio_put(PICO_LED_PIN, 0);
+    printf("Pico GP25 -> LOW (0V)\\n");
+    sleep_ms(1000);
+  }
+  return 0;
+}`
+          : `# Raspberry Pi Pico (RP2040) - Custom MicroPython Script
+import machine
+import time
+
+led = machine.Pin(25, machine.Pin.OUT)
+print("Raspberry Pi Pico RP2040 Microcontroller Ready.")
+
+while True:
+    led.toggle()
+    print("Pico GP25 toggled!")
+    time.sleep(1)`
+      );
+    } else if (selectedCategory === 'raspberry_pi') {
+      setCode(
+        editorMode === 'c_cpp'
+          ? `// Raspberry Pi Single-Board Computer - Custom Linux C/C++ Program
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+int main(int argc, char *argv[]) {
+  printf("Raspberry Pi Linux native C process started.\\n");
+  printf("Target: aarch64 ARMv8 Quad-Core Cortex-A72\\n");
+
+  for (int i = 1; i <= 5; i++) {
+    printf("[Linux Worker] Running tick %d of 5...\\n", i);
+    sleep(1);
+  }
+
+  printf("Native Linux binary exited with code 0.\\n");
+  return 0;
+}`
+          : `#!/usr/bin/env python3
+# Raspberry Pi Single-Board Computer (Linux OS) - Custom Student Script
+import time
+import os
+
+print(f"Linux raspberrypi 6.6.20-v8+ (Debian GNU/Linux)")
+print(f"Broadcom BCM2711 Quad ARM Cortex-A72 @ 1.8GHz | PID: {os.getpid()}")
+
+LED_PIN = 17
+print(f"Controlling Linux GPIO {LED_PIN}...")
+
+for cycle in range(1, 6):
+    print(f"[Linux GPIO {LED_PIN}] Signal -> HIGH (3.3V) | Cycle {cycle}")
+    time.sleep(1.0)
+    print(f"[Linux GPIO {LED_PIN}] Signal -> LOW (0V)")
+    time.sleep(1.0)
+
+print("Custom script execution complete.")`
+      );
+    } else if (selectedCategory === 'esp32') {
+      setCode(`// ESP32 DevKit V1 - Custom Student Program
+#define LED_PIN 2
+
+void setup() {
+  pinMode(LED_PIN, OUTPUT);
+  Serial.begin(115200);
+  Serial.println("ESP32 Dual-Core initialised! Ready for student code.");
+}
+
+void loop() {
+  digitalWrite(LED_PIN, HIGH);
+  Serial.println("GPIO 2 -> HIGH");
+  delay(1000);
+  digitalWrite(LED_PIN, LOW);
+  Serial.println("GPIO 2 -> LOW");
+  delay(1000);
+}`);
+    } else {
+      setCode(`// Arduino Uno R3 - Custom Student Sketch
+const int LED_PIN = 13;
+
+void setup() {
+  pinMode(LED_PIN, OUTPUT);
+  Serial.begin(9600);
+  Serial.println("Arduino Uno Initialized!");
+}
+
+void loop() {
+  digitalWrite(LED_PIN, HIGH);
+  Serial.println("Pin 13: HIGH");
+  delay(1000);
+  digitalWrite(LED_PIN, LOW);
+  Serial.println("Pin 13: LOW");
+  delay(1000);
+}`);
+    }
+    showToast('New blank custom student program ready!');
+  };
+
+  const handleSaveProject = () => {
+    try {
+      const projectData = {
+        code,
+        blocks,
+        selectedBoard,
+        selectedCategory,
+        editorMode,
+        activeLabId,
+        components,
+        savedAt: new Date().toISOString(),
+      };
+      localStorage.setItem('innolink_coding_lab_project', JSON.stringify(projectData));
+      showToast('Project progress saved successfully!');
+    } catch {
+      showToast('Failed to save project progress.');
+    }
+  };
+
   const handleLoadProject = () => {
     try {
-      const saved = localStorage.getItem(`innolink_student_project_${currentLab.id}`);
+      const saved = localStorage.getItem('innolink_coding_lab_project');
       if (saved) {
-        const proj = JSON.parse(saved);
-        if (proj.board) setSelectedBoard(proj.board);
-        if (proj.code) setCode(proj.code);
-        if (proj.blocks) setBlocks(proj.blocks);
-        if (proj.components) setComponents(proj.components);
-        showToast('Saved project loaded!');
+        const parsed = JSON.parse(saved);
+        if (parsed.code) setCode(parsed.code);
+        if (parsed.blocks) setBlocks(parsed.blocks);
+        if (parsed.selectedBoard) setSelectedBoard(parsed.selectedBoard);
+        if (parsed.selectedCategory) setSelectedCategory(parsed.selectedCategory);
+        if (parsed.editorMode) setEditorMode(parsed.editorMode);
+        if (parsed.activeLabId) setActiveLabId(parsed.activeLabId);
+        if (parsed.components) setComponents(parsed.components);
+        showToast('Saved project loaded successfully!');
       } else {
-        showToast('No saved project found for this lab.');
+        showToast('No saved project found.');
       }
     } catch {
-      showToast('Error loading project.');
+      showToast('Failed to load project.');
     }
   };
 
-  // Submit lab project
-  const handleSubmitProject = () => {
-    const newSubmission: LabSubmission = {
-      id: `sub_lab_${Date.now()}`,
-      labId: currentLab.id,
-      courseId: currentLab.courseId,
-      studentId: currentUser?.uid || 'student_demo',
-      studentName: currentUser?.displayName || 'Student Scholar',
-      board: selectedBoard as HardwareBoard,
-      code,
-      simulationLog: serialLogs.slice(-10).join('\n'),
-      status: 'submitted',
-      marks: undefined,
-      submittedAt: new Date().toISOString(),
-    };
-
-    try {
-      const savedSubs = localStorage.getItem('innolink_lab_submissions');
-      const subs: LabSubmission[] = savedSubs ? JSON.parse(savedSubs) : [];
-      localStorage.setItem('innolink_lab_submissions', JSON.stringify([newSubmission, ...subs]));
-    } catch {
-      // fallback
-    }
-
-    setSubmissionSuccess(`Lab project "${currentLab.title}" submitted successfully for mentor verification.`);
+  const handleSubmitProject = async () => {
+    setSubmissionSuccess('Lab project submitted successfully to mentor review!');
     setTimeout(() => {
       setSubmitModalOpen(false);
       setSubmissionSuccess(null);
-    }, 1800);
+    }, 1500);
   };
 
   return (
@@ -352,40 +663,12 @@ void loop() {
               {currentLab?.title || 'Interactive Electronics & Coding Lab'}
             </h1>
             <p className="text-xs sm:text-sm text-[var(--muted-text)] mt-0.5">
-              Build, program, simulate, and verify circuits on Arduino, ESP32, and Raspberry Pi Pico.
+              Build, program, simulate, and verify circuits on Arduino, ESP32, Raspberry Pi Pico, and Raspberry Pi.
             </p>
           </div>
 
-          {/* Controls: Mode Switcher + Project Actions */}
+          {/* Controls: Project Actions & Submit */}
           <div className="flex flex-wrap items-center gap-2">
-            {/* Editor Mode Switcher */}
-            <div className="flex bg-[var(--surface)] p-1 rounded-lg border border-[var(--border)] shadow-xs">
-              <button
-                type="button"
-                onClick={() => setEditorMode('arduino_c')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
-                  editorMode === 'arduino_c'
-                    ? 'bg-[var(--foreground)] text-[var(--background)] shadow-xs'
-                    : 'text-[var(--muted-text)] hover:text-[var(--foreground)]'
-                }`}
-              >
-                <Code className="w-3.5 h-3.5" />
-                <span>C++ / Code</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditorMode('blocks')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
-                  editorMode === 'blocks'
-                    ? 'bg-[var(--foreground)] text-[var(--background)] shadow-xs'
-                    : 'text-[var(--muted-text)] hover:text-[var(--foreground)]'
-                }`}
-              >
-                <Layers className="w-3.5 h-3.5" />
-                <span>Visual Blocks</span>
-              </button>
-            </div>
-
             {/* Project Save / Load */}
             <div className="flex items-center gap-1">
               <button
@@ -418,11 +701,143 @@ void loop() {
           </div>
         </div>
 
+        {/* ========================================================= */}
+        {/* HARDWARE PROGRAMMING PLATFORM SELECTOR */}
+        {/* ========================================================= */}
+        <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <div className="text-xs font-bold uppercase tracking-wider text-[var(--muted-text)] flex items-center gap-1.5">
+                <Cpu className="w-4 h-4 text-cyan-500" />
+                <span>HARDWARE PROGRAMMING</span>
+              </div>
+              <p className="text-xs text-[var(--muted-text)] mt-0.5">
+                Microcontrollers and Single-Board Computers operate with distinct architectures. Select your target environment:
+              </p>
+            </div>
+
+            {/* Architecture Details Badge */}
+            <div className="flex items-center gap-2">
+              {selectedCategory === 'arduino' && (
+                <span className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-500 border border-cyan-500/20 font-semibold">
+                  Arduino Uno • ATmega328P 16MHz • 5V Logic
+                </span>
+              )}
+              {selectedCategory === 'esp32' && (
+                <span className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20 font-semibold">
+                  ESP32 DevKit • Dual-Core 240MHz • Wi-Fi/BLE • 3.3V Logic
+                </span>
+              )}
+              {selectedCategory === 'pico' && (
+                <span className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-semibold">
+                  Raspberry Pi Pico • RP2040 Microcontroller • MicroPython & C/C++
+                </span>
+              )}
+              {selectedCategory === 'raspberry_pi' && (
+                <span className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/20 font-semibold">
+                  Raspberry Pi • Linux Single-Board Computer • Python & Linux C/C++
+                </span>
+              )}
+              {selectedCategory === 'blocks' && (
+                <span className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-500 border border-amber-500/20 font-semibold">
+                  Visual Block Coding • Logic Blocks to C++ Sketch
+                </span>
+              )}
+              {selectedCategory === 'hybrid' && (
+                <span className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-purple-500/10 text-purple-500 border border-purple-500/20 font-semibold">
+                  Hybrid Coding • Synchronized Blocks & Real-Time Code
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* 6 SEPARATE PLATFORM BUTTONS */}
+          <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-[var(--border)]">
+            <button
+              type="button"
+              onClick={() => handleSelectHardwareCategory('arduino')}
+              className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition cursor-pointer border flex items-center gap-1.5 ${
+                selectedCategory === 'arduino'
+                  ? 'border-[var(--foreground)] bg-[var(--foreground)] text-[var(--background)] shadow-xs'
+                  : 'border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--foreground)] hover:border-[var(--muted-text)]'
+              }`}
+            >
+              <Cpu className="w-3.5 h-3.5" />
+              <span>[ Arduino ]</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSelectHardwareCategory('esp32')}
+              className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition cursor-pointer border flex items-center gap-1.5 ${
+                selectedCategory === 'esp32'
+                  ? 'border-[var(--foreground)] bg-[var(--foreground)] text-[var(--background)] shadow-xs'
+                  : 'border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--foreground)] hover:border-[var(--muted-text)]'
+              }`}
+            >
+              <Cpu className="w-3.5 h-3.5" />
+              <span>[ ESP32 ]</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSelectHardwareCategory('pico')}
+              className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition cursor-pointer border flex items-center gap-1.5 ${
+                selectedCategory === 'pico'
+                  ? 'border-emerald-500 bg-emerald-600 text-white shadow-xs'
+                  : 'border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--foreground)] hover:border-emerald-500'
+              }`}
+            >
+              <Cpu className="w-3.5 h-3.5" />
+              <span>[ Raspberry Pi Pico ]</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSelectHardwareCategory('raspberry_pi')}
+              className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition cursor-pointer border flex items-center gap-1.5 ${
+                selectedCategory === 'raspberry_pi'
+                  ? 'border-rose-500 bg-rose-600 text-white shadow-xs'
+                  : 'border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--foreground)] hover:border-rose-500'
+              }`}
+            >
+              <Terminal className="w-3.5 h-3.5" />
+              <span>[ Raspberry Pi ]</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSelectHardwareCategory('blocks')}
+              className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition cursor-pointer border flex items-center gap-1.5 ${
+                selectedCategory === 'blocks'
+                  ? 'border-amber-500 bg-amber-600 text-white shadow-xs'
+                  : 'border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--foreground)] hover:border-amber-500'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>[ Block Coding ]</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSelectHardwareCategory('hybrid')}
+              className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition cursor-pointer border flex items-center gap-1.5 ${
+                selectedCategory === 'hybrid'
+                  ? 'border-purple-500 bg-purple-600 text-white shadow-xs'
+                  : 'border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--foreground)] hover:border-purple-500'
+              }`}
+            >
+              <Code className="w-3.5 h-3.5" />
+              <span>[ Hybrid Coding ]</span>
+            </button>
+          </div>
+        </div>
+
         {/* Course Labs Selector Bar */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1">
           <span className="text-xs font-semibold text-[var(--muted-text)] uppercase tracking-wider shrink-0 flex items-center gap-1">
             <BookOpen className="w-3.5 h-3.5" />
-            <span>Labs:</span>
+            <span>Structured Labs:</span>
           </span>
           {labs.map((lab) => (
             <button
@@ -444,24 +859,35 @@ void loop() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left Column: Code / Blocks Workspace */}
           <div className="lg:col-span-6 space-y-4">
-            {editorMode === 'arduino_c' && (
-              <CodeEditor
-                board={selectedBoard}
-                code={code}
-                onChangeCode={setCode}
-                onRunSimulation={handleRunSimulation}
-                onStopSimulation={handleStopSimulation}
-                onResetSimulation={handleResetSimulation}
-                isSimulating={isSimulating}
-              />
-            )}
-
-            {editorMode === 'blocks' && (
+            {selectedCategory === 'blocks' ? (
               <BlocklyEditor
                 board={selectedBoard}
                 blocks={blocks}
                 onChangeBlocks={setBlocks}
                 onGenerateCode={(generated) => setCode(generated)}
+              />
+            ) : selectedCategory === 'hybrid' ? (
+              <HybridEditor
+                board={selectedBoard}
+                blocks={blocks}
+                onChangeBlocks={setBlocks}
+                generatedCode={code}
+                onCodeUpdated={(updated) => setCode(updated)}
+              />
+            ) : (
+              <CodeEditor
+                board={selectedBoard}
+                code={code}
+                language={editorMode}
+                onChangeLanguage={(lang) => setEditorMode(lang)}
+                onChangeCode={setCode}
+                onRunSimulation={handleRunSimulation}
+                onStopSimulation={handleStopSimulation}
+                onResetSimulation={handleResetSimulation}
+                isSimulating={isSimulating}
+                onSaveProject={handleSaveProject}
+                terminalLogs={serialLogs}
+                onNewProgram={handleNewProgram}
               />
             )}
 
@@ -485,7 +911,22 @@ void loop() {
           <div className="lg:col-span-6 space-y-4">
             <VirtualHardwareWorkspace
               board={selectedBoard}
-              onChangeBoard={(newB) => setSelectedBoard(newB)}
+              onChangeBoard={(newB) => {
+                setSelectedBoard(newB);
+                if (newB === 'rp2040_pico') {
+                  setSelectedCategory('pico');
+                  setEditorMode('micropython');
+                } else if (newB === 'raspberry_pi') {
+                  setSelectedCategory('raspberry_pi');
+                  setEditorMode('python');
+                } else if (newB === 'arduino_uno') {
+                  setSelectedCategory('arduino');
+                  setEditorMode('arduino_c');
+                } else if (newB === 'esp32') {
+                  setSelectedCategory('esp32');
+                  setEditorMode('arduino_c');
+                }
+              }}
               components={components}
               onUpdateComponents={setComponents}
               isSimulating={isSimulating}

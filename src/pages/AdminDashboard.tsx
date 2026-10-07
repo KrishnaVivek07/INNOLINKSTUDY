@@ -182,21 +182,52 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // --------------------------------------------------------------------------
-  // STATE: Owner Credential Changes (5-digit Master PIN Protected)
+  // STATE: Owner Credential Changes (Security PIN Protected 2-Step Flow)
   // --------------------------------------------------------------------------
-  const [masterPin, setMasterPin] = useState('');
+  const [pinStepVerified, setPinStepVerified] = useState(false);
+  const [securityPin, setSecurityPin] = useState('');
+  const [pinVerifying, setPinVerifying] = useState(false);
   const [newOwnerUsername, setNewOwnerUsername] = useState('');
   const [newOwnerPassword, setNewOwnerPassword] = useState('');
   const [confirmOwnerPassword, setConfirmOwnerPassword] = useState('');
   const [credChangeLoading, setCredChangeLoading] = useState(false);
-  const [showMasterPin, setShowMasterPin] = useState(false);
+  const [showSecurityPin, setShowSecurityPin] = useState(false);
   const [showNewOwnerPassword, setShowNewOwnerPassword] = useState(false);
   const [showConfirmOwnerPassword, setShowConfirmOwnerPassword] = useState(false);
 
+  const handleVerifySecurityPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanPin = securityPin.trim();
+    if (!cleanPin || cleanPin.length !== 5) {
+      showToast('Invalid security PIN');
+      return;
+    }
+
+    setPinVerifying(true);
+    try {
+      const res = await fetch('/api/owner/verify-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: cleanPin }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.verified) {
+        showToast('Invalid security PIN');
+        return;
+      }
+      setPinStepVerified(true);
+      showToast('Security PIN verified. You can now update your credentials.');
+    } catch (err: any) {
+      showToast('Invalid security PIN');
+    } finally {
+      setPinVerifying(false);
+    }
+  };
+
   const handleUpdateOwnerCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!masterPin || masterPin.trim().length !== 5) {
-      showToast('Invalid security PIN');
+    if (!pinStepVerified) {
+      showToast('Please verify your security PIN first.');
       return;
     }
     if (newOwnerPassword.length < 6) {
@@ -211,13 +242,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setCredChangeLoading(true);
     try {
       const msg = await changeOwnerCredentials(
-        masterPin.trim(),
+        securityPin.trim(),
         newOwnerUsername.trim(),
         newOwnerPassword.trim(),
         confirmOwnerPassword.trim()
       );
       showToast(msg);
-      setMasterPin('');
+      setSecurityPin('');
+      setPinStepVerified(false);
       setNewOwnerUsername('');
       setNewOwnerPassword('');
       setConfirmOwnerPassword('');
@@ -2083,9 +2115,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {/* SECTION 2: OWNER SECURITY & CREDENTIALS CHANGE */}
           <div className="p-5 rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-xs space-y-4">
             <div>
-              <h3 className="text-sm font-bold text-[var(--foreground)]">Owner Security & Credentials</h3>
+              <h3 className="text-sm font-bold text-[var(--foreground)]">Security & Credentials</h3>
               <p className="text-xs text-[var(--muted-text)] mt-0.5">
-                Change your login credentials protected by the 5-digit Master PIN and Firebase Authentication.
+                Change your login credentials protected by your configured Security PIN.
               </p>
             </div>
 
@@ -2094,95 +2126,130 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <strong>Authorized Account:</strong> {currentUser?.email || 'kkscreative@innolink.tech'}
               </p>
               <p>
-                <strong>Access Level:</strong> Platform Owner & Curriculum Supervisor
+                <strong>Access Level:</strong> Platform Owner & Platform Administrator
               </p>
             </div>
 
-            <form onSubmit={handleUpdateOwnerCredentials} className="space-y-3.5 text-xs max-w-md">
-              <div>
-                <label className="block font-semibold text-[var(--foreground)] mb-1">Master PIN</label>
-                <div className="relative">
-                  <input
-                    type={showMasterPin ? 'text' : 'password'}
-                    required
-                    maxLength={5}
-                    value={masterPin}
-                    onChange={(e) => setMasterPin(e.target.value.replace(/\D/g, '').slice(0, 5))}
-                    placeholder="•••••"
-                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] p-2 pr-9 text-[var(--foreground)] font-mono tracking-widest"
-                  />
+            {!pinStepVerified ? (
+              /* STEP 1: Verify Security PIN */
+              <form onSubmit={handleVerifySecurityPin} className="space-y-3.5 text-xs max-w-md">
+                <div className="p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] text-[11px] text-[var(--muted-text)]">
+                  Enter your configured Security PIN to authorize changing your login credentials.
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-[var(--foreground)] mb-1">Security PIN</label>
+                  <div className="relative">
+                    <input
+                      type={showSecurityPin ? 'text' : 'password'}
+                      required
+                      maxLength={5}
+                      value={securityPin}
+                      onChange={(e) => setSecurityPin(e.target.value.replace(/\D/g, '').slice(0, 5))}
+                      placeholder="•••••"
+                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] p-2 pr-9 text-[var(--foreground)] font-mono tracking-widest"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSecurityPin(!showSecurityPin)}
+                      className="absolute right-2.5 top-2.5 text-[var(--muted-text)] hover:text-[var(--foreground)] cursor-pointer"
+                    >
+                      {showSecurityPin ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={pinVerifying}
+                  className="w-full py-2.5 rounded-lg bg-[var(--foreground)] hover:opacity-90 disabled:opacity-50 text-[var(--background)] font-semibold transition cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  {pinVerifying ? 'Verifying...' : 'Verify'}
+                </button>
+              </form>
+            ) : (
+              /* STEP 2: Change Login Credentials */
+              <form onSubmit={handleUpdateOwnerCredentials} className="space-y-3.5 text-xs max-w-md">
+                <div className="p-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 text-xs font-medium flex items-center justify-between">
+                  <span>✓ Security PIN verified</span>
                   <button
                     type="button"
-                    onClick={() => setShowMasterPin(!showMasterPin)}
-                    className="absolute right-2.5 top-2.5 text-[var(--muted-text)] hover:text-[var(--foreground)] cursor-pointer"
+                    onClick={() => {
+                      setPinStepVerified(false);
+                      setSecurityPin('');
+                    }}
+                    className="text-[11px] underline hover:opacity-80 cursor-pointer"
                   >
-                    {showMasterPin ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    Lock
                   </button>
                 </div>
-                <p className="text-[10px] text-[var(--muted-text)] mt-0.5">5-digit numeric security PIN required to authorize credential changes.</p>
-              </div>
 
-              <div>
-                <label className="block font-semibold text-[var(--foreground)] mb-1">New Username / Email</label>
-                <input
-                  type="text"
-                  value={newOwnerUsername}
-                  onChange={(e) => setNewOwnerUsername(e.target.value)}
-                  placeholder="e.g. KKSCREATIVE or owner@innolink.tech"
-                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] p-2 text-[var(--foreground)]"
-                />
-              </div>
+                <div className="font-semibold text-xs text-[var(--foreground)] pt-1">
+                  Change Login Credentials
+                </div>
 
-              <div>
-                <label className="block font-semibold text-[var(--foreground)] mb-1">New Password</label>
-                <div className="relative">
+                <div>
+                  <label className="block font-semibold text-[var(--foreground)] mb-1">New Username / Email</label>
                   <input
-                    type={showNewOwnerPassword ? 'text' : 'password'}
-                    required
-                    value={newOwnerPassword}
-                    onChange={(e) => setNewOwnerPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] p-2 pr-9 text-[var(--foreground)]"
+                    type="text"
+                    value={newOwnerUsername}
+                    onChange={(e) => setNewOwnerUsername(e.target.value)}
+                    placeholder="e.g. KKSCREATIVE or owner@innolink.tech"
+                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] p-2 text-[var(--foreground)]"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowNewOwnerPassword(!showNewOwnerPassword)}
-                    className="absolute right-2.5 top-2.5 text-[var(--muted-text)] hover:text-[var(--foreground)] cursor-pointer"
-                  >
-                    {showNewOwnerPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  </button>
                 </div>
-              </div>
 
-              <div>
-                <label className="block font-semibold text-[var(--foreground)] mb-1">Confirm Password</label>
-                <div className="relative">
-                  <input
-                    type={showConfirmOwnerPassword ? 'text' : 'password'}
-                    required
-                    value={confirmOwnerPassword}
-                    onChange={(e) => setConfirmOwnerPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] p-2 pr-9 text-[var(--foreground)]"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmOwnerPassword(!showConfirmOwnerPassword)}
-                    className="absolute right-2.5 top-2.5 text-[var(--muted-text)] hover:text-[var(--foreground)] cursor-pointer"
-                  >
-                    {showConfirmOwnerPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  </button>
+                <div>
+                  <label className="block font-semibold text-[var(--foreground)] mb-1">New Password</label>
+                  <div className="relative">
+                    <input
+                      type={showNewOwnerPassword ? 'text' : 'password'}
+                      required
+                      value={newOwnerPassword}
+                      onChange={(e) => setNewOwnerPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] p-2 pr-9 text-[var(--foreground)]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewOwnerPassword(!showNewOwnerPassword)}
+                      className="absolute right-2.5 top-2.5 text-[var(--muted-text)] hover:text-[var(--foreground)] cursor-pointer"
+                    >
+                      {showNewOwnerPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              <button
-                type="submit"
-                disabled={credChangeLoading}
-                className="w-full py-2.5 rounded-lg bg-[var(--foreground)] hover:opacity-90 disabled:opacity-50 text-[var(--background)] font-semibold transition cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                {credChangeLoading ? 'Verifying & Updating...' : 'Update Credentials'}
-              </button>
-            </form>
+                <div>
+                  <label className="block font-semibold text-[var(--foreground)] mb-1">Confirm New Password</label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmOwnerPassword ? 'text' : 'password'}
+                      required
+                      value={confirmOwnerPassword}
+                      onChange={(e) => setConfirmOwnerPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] p-2 pr-9 text-[var(--foreground)]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmOwnerPassword(!showConfirmOwnerPassword)}
+                      className="absolute right-2.5 top-2.5 text-[var(--muted-text)] hover:text-[var(--foreground)] cursor-pointer"
+                    >
+                      {showConfirmOwnerPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={credChangeLoading}
+                  className="w-full py-2.5 rounded-lg bg-[var(--foreground)] hover:opacity-90 disabled:opacity-50 text-[var(--background)] font-semibold transition cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  {credChangeLoading ? 'Updating Credentials...' : 'Update Credentials'}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}

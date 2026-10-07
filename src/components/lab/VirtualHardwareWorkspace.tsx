@@ -124,8 +124,10 @@ export const VirtualHardwareWorkspace: React.FC<VirtualHardwareWorkspaceProps> =
     const defaultPin =
       boardDef.family === 'esp32' && catItem.type === 'potentiometer'
         ? '34'
-        : boardDef.family === 'raspberry_pi' && catItem.type === 'potentiometer'
-        ? 'GP26'
+        : boardDef.family === 'raspberry_pi_pico'
+        ? (catItem.type === 'potentiometer' ? 'GP26' : catItem.type === 'led' ? 'GP25' : 'GP14')
+        : boardDef.family === 'raspberry_pi'
+        ? (catItem.type === 'potentiometer' ? 'GPIO4' : catItem.type === 'led' ? 'GPIO17' : 'GPIO27')
         : catItem.defaultPin;
 
     const newComp: SimulatedComponent = {
@@ -194,9 +196,12 @@ export const VirtualHardwareWorkspace: React.FC<VirtualHardwareWorkspaceProps> =
               <option value="esp32">ESP32 DevKit V1 (Xtensa LX6 / Wi-Fi)</option>
               <option value="esp32_c3">ESP32-C3 RISC-V DevKit</option>
             </optgroup>
-            <optgroup label="Raspberry Pi Silicon">
-              <option value="rp2040_pico">Raspberry Pi Pico (RP2040)</option>
-              <option value="rp2040_pico_w">Raspberry Pi Pico W (Wi-Fi)</option>
+            <optgroup label="Raspberry Pi Pico (Microcontroller)">
+              <option value="rp2040_pico">Raspberry Pi Pico (RP2040 Microcontroller)</option>
+              <option value="rp2040_pico_w">Raspberry Pi Pico W (Wi-Fi Microcontroller)</option>
+            </optgroup>
+            <optgroup label="Raspberry Pi (Single-Board Computer)">
+              <option value="raspberry_pi">Raspberry Pi 4 / 5 (Linux SBC)</option>
             </optgroup>
           </select>
         </div>

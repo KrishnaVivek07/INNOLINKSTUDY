@@ -9,12 +9,13 @@ export interface BoardPin {
 export interface BoardDefinition {
   id: string;
   name: string;
-  family: 'arduino' | 'esp32' | 'raspberry_pi';
+  family: 'arduino' | 'esp32' | 'raspberry_pi_pico' | 'raspberry_pi';
+  category: 'microcontroller' | 'single_board_computer';
   mcu: string;
   flashSize: string;
   operatingVoltage: string;
   clockSpeed: string;
-  supportedLanguages: ('arduino_c' | 'micropython' | 'blocks')[];
+  supportedLanguages: ('arduino_c' | 'micropython' | 'python' | 'c_cpp' | 'blocks')[];
   defaultBaudRate: number;
   availablePins: BoardPin[];
   features: string[];
@@ -25,6 +26,7 @@ export const BOARD_REGISTRY: Record<string, BoardDefinition> = {
     id: 'arduino_uno',
     name: 'Arduino Uno R3',
     family: 'arduino',
+    category: 'microcontroller',
     mcu: 'ATmega328P',
     flashSize: '32 KB',
     operatingVoltage: '5V',
@@ -62,6 +64,7 @@ export const BOARD_REGISTRY: Record<string, BoardDefinition> = {
     id: 'arduino_nano',
     name: 'Arduino Nano V3',
     family: 'arduino',
+    category: 'microcontroller',
     mcu: 'ATmega328P',
     flashSize: '32 KB',
     operatingVoltage: '5V',
@@ -94,6 +97,7 @@ export const BOARD_REGISTRY: Record<string, BoardDefinition> = {
     id: 'arduino_mega',
     name: 'Arduino Mega 2560',
     family: 'arduino',
+    category: 'microcontroller',
     mcu: 'ATmega2560',
     flashSize: '256 KB',
     operatingVoltage: '5V',
@@ -119,6 +123,7 @@ export const BOARD_REGISTRY: Record<string, BoardDefinition> = {
     id: 'esp32',
     name: 'ESP32 DevKit V1 (WROOM-32)',
     family: 'esp32',
+    category: 'microcontroller',
     mcu: 'Xtensa Dual-Core 32-bit LX6',
     flashSize: '4 MB',
     operatingVoltage: '3.3V',
@@ -152,6 +157,7 @@ export const BOARD_REGISTRY: Record<string, BoardDefinition> = {
     id: 'esp32_c3',
     name: 'ESP32-C3 RISC-V DevKit',
     family: 'esp32',
+    category: 'microcontroller',
     mcu: 'Single-Core 32-bit RISC-V',
     flashSize: '4 MB',
     operatingVoltage: '3.3V',
@@ -172,14 +178,15 @@ export const BOARD_REGISTRY: Record<string, BoardDefinition> = {
   rp2040_pico: {
     id: 'rp2040_pico',
     name: 'Raspberry Pi Pico (RP2040)',
-    family: 'raspberry_pi',
+    family: 'raspberry_pi_pico',
+    category: 'microcontroller',
     mcu: 'Dual ARM Cortex-M0+',
     flashSize: '2 MB',
     operatingVoltage: '3.3V',
     clockSpeed: '133 MHz',
-    supportedLanguages: ['arduino_c', 'micropython', 'blocks'],
+    supportedLanguages: ['micropython', 'arduino_c', 'blocks'],
     defaultBaudRate: 115200,
-    features: ['Dual ARM Cortex M0+', '264 KB SRAM', '8 Programmable I/O (PIO)', '12-bit ADC'],
+    features: ['Dual ARM Cortex M0+', '264 KB SRAM', '8 Programmable I/O (PIO)', '12-bit ADC', 'MicroPython / C/C++'],
     availablePins: [
       { id: 'GP0', name: 'GP0 (UART0 TX)', type: 'uart', voltage: '3.3V', description: 'UART0 Transmit / I2C0 SDA' },
       { id: 'GP1', name: 'GP1 (UART0 RX)', type: 'uart', voltage: '3.3V', description: 'UART0 Receive / I2C0 SCL' },
@@ -201,12 +208,13 @@ export const BOARD_REGISTRY: Record<string, BoardDefinition> = {
   rp2040_pico_w: {
     id: 'rp2040_pico_w',
     name: 'Raspberry Pi Pico W',
-    family: 'raspberry_pi',
+    family: 'raspberry_pi_pico',
+    category: 'microcontroller',
     mcu: 'Dual ARM Cortex-M0+ & CYW43439',
     flashSize: '2 MB',
     operatingVoltage: '3.3V',
     clockSpeed: '133 MHz',
-    supportedLanguages: ['arduino_c', 'micropython', 'blocks'],
+    supportedLanguages: ['micropython', 'arduino_c', 'blocks'],
     defaultBaudRate: 115200,
     features: ['Wi-Fi 802.11n 2.4GHz', 'Bluetooth 5.2', '8 Programmable I/O (PIO)', '264 KB SRAM'],
     availablePins: [
@@ -218,6 +226,45 @@ export const BOARD_REGISTRY: Record<string, BoardDefinition> = {
       { id: 'GP26', name: 'GP26 (ADC0)', type: 'analog', voltage: '3.3V', description: 'Analog Input ADC0' },
       { id: '3V3', name: '3V3', type: 'power', voltage: '3.3V', description: '3.3V Output' },
       { id: 'GND', name: 'GND', type: 'ground', voltage: '0V', description: 'Ground' },
+    ],
+  },
+  raspberry_pi: {
+    id: 'raspberry_pi',
+    name: 'Raspberry Pi 4 / 5 (Linux SBC)',
+    family: 'raspberry_pi',
+    category: 'single_board_computer',
+    mcu: 'Quad-Core 64-bit ARM Cortex-A72 / A76 (Linux OS)',
+    flashSize: 'MicroSD / NVMe (32GB - 128GB)',
+    operatingVoltage: '3.3V (Logic) / 5V (USB-C)',
+    clockSpeed: '1.8 GHz - 2.4 GHz',
+    supportedLanguages: ['python', 'c_cpp'],
+    defaultBaudRate: 115200,
+    features: [
+      'Linux Operating System (Raspberry Pi OS)',
+      'Python (RPi.GPIO / gpiozero)',
+      'Standard Linux C/C++ (libgpiod)',
+      '40-Pin Extended GPIO Header',
+      'Dual 4K Micro-HDMI & Gigabit Ethernet',
+    ],
+    availablePins: [
+      { id: 'GPIO2', name: 'GPIO 2 (SDA1)', type: 'i2c', voltage: '3.3V', description: 'I2C Data Line / Pin 3' },
+      { id: 'GPIO3', name: 'GPIO 3 (SCL1)', type: 'i2c', voltage: '3.3V', description: 'I2C Clock Line / Pin 5' },
+      { id: 'GPIO4', name: 'GPIO 4 (GPCLK0)', type: 'digital', voltage: '3.3V', description: 'General Purpose Clock / Pin 7' },
+      { id: 'GPIO14', name: 'GPIO 14 (TXD0)', type: 'uart', voltage: '3.3V', description: 'UART Transmit / Pin 8' },
+      { id: 'GPIO15', name: 'GPIO 15 (RXD0)', type: 'uart', voltage: '3.3V', description: 'UART Receive / Pin 10' },
+      { id: 'GPIO17', name: 'GPIO 17', type: 'digital', voltage: '3.3V', description: 'General Purpose I/O / Pin 11' },
+      { id: 'GPIO18', name: 'GPIO 18 (PWM0)', type: 'pwm', voltage: '3.3V', description: 'Hardware PWM / Pin 12' },
+      { id: 'GPIO27', name: 'GPIO 27', type: 'digital', voltage: '3.3V', description: 'General Purpose I/O / Pin 13' },
+      { id: 'GPIO22', name: 'GPIO 22', type: 'digital', voltage: '3.3V', description: 'General Purpose I/O / Pin 15' },
+      { id: 'GPIO23', name: 'GPIO 23', type: 'digital', voltage: '3.3V', description: 'General Purpose I/O / Pin 16' },
+      { id: 'GPIO24', name: 'GPIO 24', type: 'digital', voltage: '3.3V', description: 'General Purpose I/O / Pin 18' },
+      { id: 'GPIO10', name: 'GPIO 10 (MOSI)', type: 'spi', voltage: '3.3V', description: 'SPI0 Master Out / Pin 19' },
+      { id: 'GPIO9', name: 'GPIO 9 (MISO)', type: 'spi', voltage: '3.3V', description: 'SPI0 Master In / Pin 21' },
+      { id: 'GPIO11', name: 'GPIO 11 (SCLK)', type: 'spi', voltage: '3.3V', description: 'SPI0 Clock / Pin 23' },
+      { id: 'GPIO25', name: 'GPIO 25', type: 'digital', voltage: '3.3V', description: 'General Purpose I/O / Pin 22' },
+      { id: '3V3', name: '3.3V Power', type: 'power', voltage: '3.3V', description: 'Pin 1 / Pin 17' },
+      { id: '5V', name: '5V Power', type: 'power', voltage: '5V', description: 'Pin 2 / Pin 4' },
+      { id: 'GND', name: 'GND', type: 'ground', voltage: '0V', description: 'System Ground (Pin 6, 9, 14, 20, 25)' },
     ],
   },
 };

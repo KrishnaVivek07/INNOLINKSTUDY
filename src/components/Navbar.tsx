@@ -330,7 +330,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="px-3 py-1.5 rounded-lg bg-[var(--foreground)] hover:opacity-90 text-xs font-semibold text-[var(--background)] transition cursor-pointer shadow-xs flex items-center gap-1.5"
                 >
                   <Shield className="w-3.5 h-3.5" />
-                  <span>Admin Login</span>
+                  <span>Owner Login</span>
                 </button>
               </div>
             )}

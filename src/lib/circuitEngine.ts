@@ -27,7 +27,11 @@ export function validateAndSimulateCircuit(
 ): CircuitValidationResult {
   const board = BOARD_REGISTRY[boardId] || BOARD_REGISTRY.arduino_uno;
   const diagnostics: SimulationDiagnostic[] = [];
-  const validPins = new Set(board.availablePins.map((p) => p.id));
+  const validPins = new Set([
+    ...board.availablePins.map((p) => p.id),
+    ...board.availablePins.map((p) => p.id.toLowerCase()),
+    ...board.availablePins.map((p) => p.id.replace(/^GPIO|^GP/i, '')),
+  ]);
 
   // Check 1: Empty circuit check
   if (components.length === 0) {

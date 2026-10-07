@@ -55,7 +55,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [studentMode, setStudentMode] = useState<'login' | 'register' | 'forgot_password' | 'otp_step'>(
     initialMode === 'register' ? 'register' : 'login'
   );
-  const [adminMode, setAdminMode] = useState<'login' | 'change_password'>('login');
 
   // Common Form Fields
   const [name, setName] = useState('');
@@ -82,7 +81,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   useEffect(() => {
     if (initialMode === 'admin_login') {
       setPortal('admin');
-      setAdminMode('login');
     } else if (initialMode === 'register') {
       setPortal('student');
       setStudentMode('register');
@@ -90,6 +88,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setPortal('student');
       setStudentMode('login');
     }
+    setEmail('');
+    setPassword('');
     setError(null);
     setSuccessMessage(null);
   }, [initialMode, isOpen]);
@@ -111,11 +111,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleSelectPortal = (newPortal: AuthPortal) => {
     setPortal(newPortal);
     resetMessages();
+    setEmail('');
     setPassword('');
     if (newPortal === 'student') {
       setStudentMode('login');
-    } else {
-      setAdminMode('login');
     }
   };
 
@@ -203,7 +202,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  // 5. Admin Login
+  // 5. Owner Login
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     resetMessages();
@@ -216,24 +215,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         onClose();
       }, 500);
     } catch (err: any) {
-      setError(err.message || 'Owner authentication failed. Access strictly restricted.');
+      setError(err.message || 'Invalid credentials');
     } finally {
       setLoading(false);
-    }
-  };
-
-  // 6. Admin Change Password
-  const handleAdminChangePassword = (e: React.FormEvent) => {
-    e.preventDefault();
-    resetMessages();
-    try {
-      resetAdminPassword(newPassword);
-      setSuccessMessage('Admin master password updated successfully.');
-      setAdminMode('login');
-      setPassword('');
-      setNewPassword('');
-    } catch (err: any) {
-      setError(err.message || 'Failed to update admin password.');
     }
   };
 
@@ -634,132 +618,61 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         )}
 
         {/* ==================================================== */}
-        {/* 2. ADMIN PORTAL FORMS */}
+        {/* 2. OWNER PORTAL FORM */}
         {/* ==================================================== */}
         {portal === 'admin' && (
-          <>
-            {adminMode === 'login' && (
-              <form onSubmit={handleAdminLogin} className="space-y-3.5">
-                <div className="p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] flex items-start gap-2.5 text-xs text-[var(--foreground)]">
-                  <Shield className="w-4 h-4 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="block font-semibold">Authorized Personnel Only</strong>
-                    <span className="text-[var(--muted-text)] text-[11px]">
-                      Access controls courses, labs, tests, STEM hardware inventory, orders, and student accounts.
-                    </span>
-                  </div>
-                </div>
+          <form onSubmit={handleAdminLogin} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">
+                Username / Email
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-2.5 w-4 h-4 text-[var(--muted-text)]" />
+                <input
+                  type="text"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder=""
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] pl-9 pr-3 py-2 text-xs sm:text-sm text-[var(--foreground)] placeholder:text-[var(--muted-text)] focus:border-[var(--foreground)] focus:outline-none"
+                />
+              </div>
+            </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">
-                    Username / Email
-                  </label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-2.5 w-4 h-4 text-[var(--muted-text)]" />
-                    <input
-                      type="text"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="Enter username or email"
-                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] pl-9 pr-3 py-2 text-xs sm:text-sm text-[var(--foreground)] placeholder:text-[var(--muted-text)] focus:border-[var(--foreground)] focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-semibold text-[var(--foreground)]">
-                      Password
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAdminMode('change_password');
-                        resetMessages();
-                      }}
-                      className="text-[11px] text-[var(--muted-text)] hover:text-[var(--foreground)] hover:underline cursor-pointer"
-                    >
-                      Change password
-                    </button>
-                  </div>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-2.5 w-4 h-4 text-[var(--muted-text)]" />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] pl-9 pr-10 py-2 text-xs sm:text-sm text-[var(--foreground)] placeholder:text-[var(--muted-text)] focus:border-[var(--foreground)] focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-2.5 text-[var(--muted-text)] hover:text-[var(--foreground)] cursor-pointer"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="pt-1">
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full py-2.5 rounded-lg bg-[var(--foreground)] hover:opacity-90 disabled:opacity-50 text-xs sm:text-sm font-semibold text-[var(--background)] transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-                  >
-                    {loading ? (
-                      <span>Verifying Authorization...</span>
-                    ) : (
-                      <>
-                        <Shield className="w-4 h-4" />
-                        <span>Sign In</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {adminMode === 'change_password' && (
-              <form onSubmit={handleAdminChangePassword} className="space-y-3">
-                <div className="p-3 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] text-xs text-[var(--muted-text)]">
-                  Update the platform administrator access master password.
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">New Master Password</label>
-                  <input
-                    type="password"
-                    required
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter at least 6 characters"
-                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2 text-xs sm:text-sm text-[var(--foreground)] focus:border-[var(--foreground)] focus:outline-none"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-2.5 rounded-lg bg-[var(--foreground)] hover:opacity-90 text-xs sm:text-sm font-semibold text-[var(--background)] transition cursor-pointer"
-                >
-                  Save New Master Password
-                </button>
-
+            <div>
+              <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-2.5 w-4 h-4 text-[var(--muted-text)]" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder=""
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] pl-9 pr-10 py-2 text-xs sm:text-sm text-[var(--foreground)] placeholder:text-[var(--muted-text)] focus:border-[var(--foreground)] focus:outline-none"
+                />
                 <button
                   type="button"
-                  onClick={() => {
-                    setAdminMode('login');
-                    resetMessages();
-                  }}
-                  className="w-full text-center text-xs text-[var(--muted-text)] hover:text-[var(--foreground)] py-1"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-2.5 text-[var(--muted-text)] hover:text-[var(--foreground)] cursor-pointer"
                 >
-                  Cancel
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
-              </form>
-            )}
-          </>
+              </div>
+            </div>
+
+            <div className="pt-1">
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-2.5 rounded-lg bg-[var(--foreground)] hover:opacity-90 disabled:opacity-50 text-xs sm:text-sm font-semibold text-[var(--background)] transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+              >
+                {loading ? <span>Verifying...</span> : <span>Sign In</span>}
+              </button>
+            </div>
+          </form>
         )}
 
         {/* PWA DOWNLOAD ON THE LOGIN MODAL */}

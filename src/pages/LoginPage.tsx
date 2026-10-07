@@ -29,6 +29,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 }) => {
   const {
     loginAdmin,
+    changeOwnerCredentials,
     validateStudentStepOne,
     verifyStudentStepTwo,
     registerStudentRequest,
@@ -41,8 +42,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   // Exactly TWO portals: Student & Admin
   const [selectedPortal, setSelectedPortal] = useState<'student' | 'admin'>(defaultRole);
   const [studentMode, setStudentMode] = useState<'login' | 'register' | 'forgot_password' | 'otp_step'>('login');
+  const [adminMode, setAdminMode] = useState<'login' | 'reset_credentials'>('login');
 
-  // Form Fields
+  // Master PIN fields for Owner
+  const [ownerMasterPin, setOwnerMasterPin] = useState('');
+  const [newOwnerUsername, setNewOwnerUsername] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -67,6 +72,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const handlePortalSwitch = (portal: 'student' | 'admin') => {
     setSelectedPortal(portal);
     resetMessages();
+    setEmail('');
     setPassword('');
     setStudentMode('login');
   };
@@ -79,6 +85,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
     try {
       if (selectedPortal === 'admin') {
+        if (adminMode === 'reset_credentials') {
+          if (!ownerMasterPin.trim()) throw new Error('Master PIN (5 digits) is required.');
+          if (newPassword.length < 6) throw new Error('New password must be at least 6 characters.');
+          if (newPassword !== confirmPassword) throw new Error('Passwords do not match.');
+          const msg = await changeOwnerCredentials(
+            ownerMasterPin.trim(),
+            newOwnerUsername.trim() || 'KKSCREATIVE',
+            newPassword.trim(),
+            confirmPassword.trim()
+          );
+          setSuccessMsg(msg || 'Owner credentials updated successfully. Please sign in.');
+          setAdminMode('login');
+          setOwnerMasterPin('');
+          setPassword('');
+          setNewPassword('');
+          setConfirmPassword('');
+          return;
+        }
+
         await loginAdmin(email, password);
         setSuccessMsg('Administrator authenticated successfully.');
         setTimeout(onSuccess, 400);
@@ -303,78 +328,180 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               </div>
             )}
 
-            <div>
-              <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">
-                {selectedPortal === 'admin' ? 'Username / Email' : 'Student Email'}
-              </label>
-              <div className="relative">
-                <User className="absolute left-3 top-2.5 w-4 h-4 text-[var(--muted-text)]" />
-                <input
-                  type={selectedPortal === 'admin' ? 'text' : 'email'}
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder={selectedPortal === 'admin' ? 'Enter username or email' : 'student@example.com'}
-                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] pl-9 pr-3 py-2 text-xs sm:text-sm text-[var(--foreground)] placeholder:text-[var(--muted-text)] focus:border-[var(--foreground)] focus:outline-none"
-                />
-              </div>
-            </div>
-
-            {selectedPortal === 'student' && studentMode === 'forgot_password' ? (
-              <div>
-                <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">
-                  New Password
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-2.5 w-4 h-4 text-[var(--muted-text)]" />
-                  <input
-                    type="password"
-                    required
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter new password"
-                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] pl-9 pr-3 py-2 text-xs sm:text-sm text-[var(--foreground)] placeholder:text-[var(--muted-text)] focus:border-[var(--foreground)] focus:outline-none"
-                  />
+            {selectedPortal === 'admin' && adminMode === 'reset_credentials' ? (
+              <>
+                <div className="p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-xs text-cyan-700 dark:text-cyan-300">
+                  <div className="font-semibold flex items-center gap-1.5">
+                    <Shield className="w-3.5 h-3.5" />
+                    <span>Owner Master PIN Reset</span>
+                  </div>
+                  <p className="mt-1 text-[11px] opacity-90">
+                    Enter the 5-digit Master Security PIN (e.g. 95709) to update the owner username and password.
+                  </p>
                 </div>
-              </div>
-            ) : (
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-semibold text-[var(--foreground)]">
-                    Password
+
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">
+                    Master PIN (5 digits)
                   </label>
-                  {selectedPortal === 'student' && studentMode === 'login' && (
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-2.5 w-4 h-4 text-[var(--muted-text)]" />
+                    <input
+                      type="password"
+                      required
+                      maxLength={5}
+                      value={ownerMasterPin}
+                      onChange={(e) => setOwnerMasterPin(e.target.value)}
+                      placeholder="e.g. 95709"
+                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] pl-9 pr-3 py-2 text-xs sm:text-sm font-mono tracking-widest text-[var(--foreground)] placeholder:text-[var(--muted-text)] focus:border-[var(--foreground)] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">
+                    Owner Username / ID
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-2.5 w-4 h-4 text-[var(--muted-text)]" />
+                    <input
+                      type="text"
+                      value={newOwnerUsername}
+                      onChange={(e) => setNewOwnerUsername(e.target.value)}
+                      placeholder="KKSCREATIVE (leave blank to keep current)"
+                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] pl-9 pr-3 py-2 text-xs sm:text-sm text-[var(--foreground)] placeholder:text-[var(--muted-text)] focus:border-[var(--foreground)] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">
+                    New Password (min 6 chars)
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-2.5 w-4 h-4 text-[var(--muted-text)]" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="e.g. kks@2026"
+                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] pl-9 pr-10 py-2 text-xs sm:text-sm text-[var(--foreground)] placeholder:text-[var(--muted-text)] focus:border-[var(--foreground)] focus:outline-none"
+                    />
                     <button
                       type="button"
-                      onClick={() => {
-                        setStudentMode('forgot_password');
-                        resetMessages();
-                      }}
-                      className="text-[11px] text-[var(--muted-text)] hover:text-[var(--foreground)] hover:underline cursor-pointer"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-2.5 text-[var(--muted-text)] hover:text-[var(--foreground)] cursor-pointer"
                     >
-                      Forgot?
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
-                  )}
+                  </div>
                 </div>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-2.5 w-4 h-4 text-[var(--muted-text)]" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] pl-9 pr-10 py-2 text-xs sm:text-sm text-[var(--foreground)] placeholder:text-[var(--muted-text)] focus:border-[var(--foreground)] focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-2.5 text-[var(--muted-text)] hover:text-[var(--foreground)] cursor-pointer"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">
+                    Confirm New Password
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-2.5 w-4 h-4 text-[var(--muted-text)]" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Repeat new password"
+                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] pl-9 pr-3 py-2 text-xs sm:text-sm text-[var(--foreground)] placeholder:text-[var(--muted-text)] focus:border-[var(--foreground)] focus:outline-none"
+                    />
+                  </div>
                 </div>
-              </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">
+                    {selectedPortal === 'admin' ? 'Username / Email' : 'Student Email'}
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-2.5 w-4 h-4 text-[var(--muted-text)]" />
+                    <input
+                      type={selectedPortal === 'admin' ? 'text' : 'email'}
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder={selectedPortal === 'admin' ? 'KKSCREATIVE' : 'student@example.com'}
+                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] pl-9 pr-3 py-2 text-xs sm:text-sm text-[var(--foreground)] placeholder:text-[var(--muted-text)] focus:border-[var(--foreground)] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {selectedPortal === 'student' && studentMode === 'forgot_password' ? (
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">
+                      New Password
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-2.5 w-4 h-4 text-[var(--muted-text)]" />
+                      <input
+                        type="password"
+                        required
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="Enter new password"
+                        className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] pl-9 pr-3 py-2 text-xs sm:text-sm text-[var(--foreground)] placeholder:text-[var(--muted-text)] focus:border-[var(--foreground)] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-semibold text-[var(--foreground)]">
+                        Password
+                      </label>
+                      {selectedPortal === 'student' && studentMode === 'login' ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setStudentMode('forgot_password');
+                            resetMessages();
+                          }}
+                          className="text-[11px] text-[var(--muted-text)] hover:text-[var(--foreground)] hover:underline cursor-pointer"
+                        >
+                          Forgot?
+                        </button>
+                      ) : selectedPortal === 'admin' ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAdminMode('reset_credentials');
+                            resetMessages();
+                          }}
+                          className="text-[11px] text-cyan-600 dark:text-cyan-400 hover:underline cursor-pointer"
+                        >
+                          Change via Master PIN
+                        </button>
+                      ) : null}
+                    </div>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-2.5 w-4 h-4 text-[var(--muted-text)]" />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] pl-9 pr-10 py-2 text-xs sm:text-sm text-[var(--foreground)] placeholder:text-[var(--muted-text)] focus:border-[var(--foreground)] focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-2.5 text-[var(--muted-text)] hover:text-[var(--foreground)] cursor-pointer"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             <button
@@ -386,7 +513,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 {loading
                   ? 'Processing...'
                   : selectedPortal === 'admin'
-                  ? 'Sign In'
+                  ? adminMode === 'reset_credentials'
+                    ? 'Update Credentials with Master PIN'
+                    : 'Sign In'
                   : studentMode === 'forgot_password'
                   ? 'Update Password'
                   : studentMode === 'register'
@@ -395,6 +524,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               </span>
               <ArrowRight className="w-4 h-4" />
             </button>
+
+            {selectedPortal === 'admin' && adminMode === 'reset_credentials' && (
+              <div className="pt-2 border-t border-[var(--border)] text-center text-xs text-[var(--muted-text)]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdminMode('login');
+                    resetMessages();
+                  }}
+                  className="text-[var(--foreground)] hover:underline cursor-pointer"
+                >
+                  ← Back to Admin Sign In
+                </button>
+              </div>
+            )}
 
             {selectedPortal === 'student' && (
               <div className="pt-2 border-t border-[var(--border)] text-center text-xs text-[var(--muted-text)]">

@@ -311,8 +311,8 @@ export interface WorkspaceMeetSession {
 // ==========================================
 // CODING & HARDWARE LAB TYPES
 // ==========================================
-export type HardwareBoard = 'esp32' | 'arduino_uno' | 'rp2040_pico';
-export type CodingLabLanguage = 'arduino_c' | 'micropython' | 'blocks' | 'hybrid';
+export type HardwareBoard = 'arduino_uno' | 'esp32' | 'rp2040_pico' | 'raspberry_pi';
+export type CodingLabLanguage = 'arduino_c' | 'micropython' | 'python' | 'c_cpp' | 'blocks' | 'hybrid';
 
 export interface SimulatedComponent {
   id: string;
@@ -320,6 +320,7 @@ export interface SimulatedComponent {
     | 'esp32'
     | 'arduino_uno'
     | 'rp2040_pico'
+    | 'raspberry_pi'
     | 'led'
     | 'rgb_led'
     | 'resistor'

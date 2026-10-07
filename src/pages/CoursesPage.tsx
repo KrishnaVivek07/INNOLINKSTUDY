@@ -10,14 +10,11 @@ import {
   ArrowRight,
   Key,
   Search,
-  Filter,
-  Layers,
-  Sparkles,
 } from 'lucide-react';
 
 interface CoursesPageProps {
   onSelectCourse: (courseId: string) => void;
-  openAuthModal: (mode: 'student_login' | 'mentor_login' | 'register') => void;
+  openAuthModal: (mode: 'student_login' | 'admin_login' | 'register') => void;
 }
 
 export const CoursesPage: React.FC<CoursesPageProps> = ({ onSelectCourse, openAuthModal }) => {
@@ -68,25 +65,25 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({ onSelectCourse, openAu
   };
 
   return (
-    <div className="py-6 sm:py-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-slate-100 space-y-6">
+    <div className="py-6 sm:py-8 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto text-[var(--foreground)] space-y-6 transition-colors duration-200">
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[var(--border)]">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-cyan-400 mb-1">
+          <div className="text-xs font-semibold uppercase tracking-wider text-[var(--muted-text)] mb-1">
             Curriculum Catalog
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold text-[var(--foreground)] tracking-tight">
             Electronics & Technology Courses
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl">
-            Industry-calibrated courses with hands-on lab projects, video lectures, AI tutoring, and mentor assessments.
+          <p className="text-xs sm:text-sm text-[var(--muted-text)] mt-1 max-w-2xl">
+            Syllabus-structured engineering courses with circuit schematics, virtual hardware labs, and mentor-evaluated tests.
           </p>
         </div>
 
         {/* Quick Activation Key Box */}
-        <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 max-w-sm w-full shrink-0">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300 mb-1.5">
-            <Key className="w-3.5 h-3.5 text-cyan-400" />
+        <div className="p-3.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-xs max-w-sm w-full shrink-0">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--foreground)] mb-1.5">
+            <Key className="w-3.5 h-3.5 text-[var(--muted-text)]" />
             <span>Course Activation Key</span>
           </div>
           <form onSubmit={handleRedeemKey} className="flex gap-2">
@@ -95,12 +92,12 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({ onSelectCourse, openAu
               value={keyInput}
               onChange={(e) => setKeyInput(e.target.value)}
               placeholder="e.g. INNO-ELEC-XXXX"
-              className="flex-1 rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs text-cyan-300 uppercase font-mono placeholder:normal-case placeholder-slate-500 focus:border-cyan-400 focus:outline-none"
+              className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-2.5 py-1.5 text-xs text-[var(--foreground)] uppercase font-mono placeholder:normal-case placeholder:text-[var(--muted-text)] focus:border-[var(--foreground)] focus:bg-[var(--surface)] focus:outline-none"
             />
             <button
               type="submit"
               disabled={redeeming || !keyInput.trim()}
-              className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-xs font-semibold text-white transition cursor-pointer"
+              className="px-3 py-1.5 rounded-lg bg-[var(--foreground)] hover:opacity-90 disabled:opacity-50 text-xs font-semibold text-[var(--background)] transition cursor-pointer"
             >
               {redeeming ? '...' : 'Redeem'}
             </button>
@@ -108,7 +105,7 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({ onSelectCourse, openAu
           {keyMessage && (
             <p
               className={`text-[11px] mt-1.5 ${
-                keyMessage.isError ? 'text-rose-400' : 'text-emerald-400'
+                keyMessage.isError ? 'text-rose-500' : 'text-emerald-500 font-medium'
               }`}
             >
               {keyMessage.text}
@@ -125,10 +122,10 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({ onSelectCourse, openAu
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition cursor-pointer ${
+              className={`px-3 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition cursor-pointer border ${
                 selectedCategory === cat
-                  ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-semibold'
-                  : 'bg-slate-900/60 text-slate-400 border border-slate-800 hover:text-white hover:bg-slate-800'
+                  ? 'bg-[var(--foreground)] text-[var(--background)] border-[var(--foreground)] font-semibold'
+                  : 'bg-[var(--surface)] text-[var(--foreground)] border-[var(--border)] hover:bg-[var(--surface-secondary)]'
               }`}
             >
               {cat}
@@ -138,24 +135,24 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({ onSelectCourse, openAu
 
         {/* Search Input */}
         <div className="relative min-w-[240px]">
-          <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-500" />
+          <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-[var(--muted-text)]" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search circuits, IoT, PCB..."
-            className="w-full rounded-lg border border-slate-800 bg-slate-900/70 pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-cyan-400 focus:outline-none"
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] pl-8 pr-3 py-1.5 text-xs text-[var(--foreground)] placeholder:text-[var(--muted-text)] focus:border-[var(--foreground)] focus:outline-none shadow-xs"
           />
         </div>
       </div>
 
       {/* Course Cards Grid */}
       {filteredCourses.length === 0 ? (
-        <div className="py-16 text-center rounded-2xl border border-slate-800 bg-slate-900/40 p-8 space-y-3">
-          <BookOpen className="w-10 h-10 text-slate-600 mx-auto" />
-          <h3 className="text-base font-bold text-white">No courses published yet</h3>
-          <p className="text-xs text-slate-400 max-w-md mx-auto">
-            Mentors can build and publish complete multi-module engineering video curriculums in the Course Builder.
+        <div className="py-16 text-center rounded-xl border border-[var(--border)] bg-[var(--surface)] p-8 space-y-2 shadow-xs">
+          <BookOpen className="w-8 h-8 text-[var(--muted-text)] mx-auto" />
+          <h3 className="text-base font-semibold text-[var(--foreground)]">No courses match your filter</h3>
+          <p className="text-xs text-[var(--muted-text)] max-w-md mx-auto">
+            Try adjusting your search query or selecting a different category tab.
           </p>
         </div>
       ) : (
@@ -169,27 +166,26 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({ onSelectCourse, openAu
             return (
               <div
                 key={course.id}
-                className="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden flex flex-col justify-between hover:border-slate-700 transition shadow-sm"
+                className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden flex flex-col justify-between shadow-xs hover:border-[var(--muted-text)] transition"
               >
                 <div>
                   {/* Course Thumbnail */}
-                  <div className="relative h-44 w-full overflow-hidden bg-slate-950">
+                  <div className="relative h-44 w-full overflow-hidden bg-[var(--surface-secondary)]">
                     <img
                       src={course.coverImage}
                       alt={course.title}
-                      className="w-full h-full object-cover opacity-90"
+                      className="w-full h-full object-cover"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
-                    <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-950/80 text-cyan-300 border border-slate-700">
+                    <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded text-[10px] font-semibold bg-[var(--surface)]/95 text-[var(--foreground)] border border-[var(--border)]">
                       {course.category}
                     </span>
 
                     {enrolled ? (
-                      <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-950/90 text-emerald-300 border border-emerald-500/40">
+                      <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
                         ✓ Enrolled
                       </span>
                     ) : (
-                      <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-950/80 text-white border border-slate-700 font-mono">
+                      <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded text-[10px] font-semibold bg-[var(--foreground)] text-[var(--background)] font-mono">
                         ${course.price}
                       </span>
                     )}
@@ -198,25 +194,23 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({ onSelectCourse, openAu
                   {/* Course Body */}
                   <div className="p-4 space-y-3">
                     <div>
-                      {/* Course Title */}
-                      <h3 className="text-sm font-bold text-white line-clamp-1">
+                      <h3 className="text-sm font-bold text-[var(--foreground)] line-clamp-1">
                         {course.title}
                       </h3>
-                      {/* Short Description */}
-                      <p className="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                      <p className="text-xs text-[var(--muted-text)] mt-1 line-clamp-2 leading-relaxed">
                         {course.description}
                       </p>
                     </div>
 
                     {/* Mentor */}
-                    <div className="flex items-center justify-between text-xs text-slate-300 pt-1 border-t border-slate-800/80">
+                    <div className="flex items-center justify-between text-xs text-[var(--muted-text)] pt-2 border-t border-[var(--border)]">
                       <div className="flex items-center gap-1.5 truncate">
-                        <span className="text-slate-500 text-[11px]">Mentor:</span>
-                        <span className="font-semibold text-cyan-400 truncate text-[11px]">
+                        <span className="opacity-70 text-[11px]">Mentor:</span>
+                        <span className="font-semibold text-[var(--foreground)] truncate text-[11px]">
                           {course.mentorName}
                         </span>
                       </div>
-                      <span className="text-[11px] text-slate-400 shrink-0">
+                      <span className="text-[11px] opacity-75 shrink-0">
                         {courseModules.length} Modules • {courseLessons.length} Videos
                       </span>
                     </div>
@@ -225,22 +219,22 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({ onSelectCourse, openAu
                     {enrolled ? (
                       <div className="space-y-1 pt-1">
                         <div className="flex justify-between text-xs">
-                          <span className="text-slate-400 text-[11px]">Progress</span>
-                          <span className="font-semibold text-cyan-400 text-[11px]">
+                          <span className="text-[var(--muted-text)] text-[11px]">Progress</span>
+                          <span className="font-semibold text-[var(--foreground)] text-[11px]">
                             {progress.percentage}%
                           </span>
                         </div>
-                        <div className="h-1.5 w-full rounded-full bg-slate-950 overflow-hidden">
+                        <div className="h-1.5 w-full rounded-full bg-[var(--surface-secondary)] overflow-hidden border border-[var(--border)]">
                           <div
-                            className="h-full bg-cyan-500 rounded-full transition-all duration-300"
+                            className="h-full bg-[var(--foreground)] rounded-full transition-all duration-300"
                             style={{ width: `${progress.percentage}%` }}
                           />
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                      <div className="flex items-center justify-between text-[11px] text-[var(--muted-text)] pt-1">
                         <span>Lifetime Access</span>
-                        <span className="text-emerald-400 font-medium">Single One-Time Fee</span>
+                        <span className="text-emerald-500 font-medium">Single One-Time Fee</span>
                       </div>
                     )}
                   </div>
@@ -250,11 +244,7 @@ export const CoursesPage: React.FC<CoursesPageProps> = ({ onSelectCourse, openAu
                 <div className="p-4 pt-0">
                   <button
                     onClick={() => onSelectCourse(course.id)}
-                    className={`w-full py-2 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                      enrolled
-                        ? 'bg-cyan-600 hover:bg-cyan-500 text-white'
-                        : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
-                    }`}
+                    className="w-full py-2 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 bg-[var(--foreground)] hover:opacity-90 text-[var(--background)] shadow-xs"
                   >
                     {enrolled ? (
                       <>

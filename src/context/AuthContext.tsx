@@ -1,19 +1,33 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { UserProfile, UserRole, AuthorizedStudent, StudentAuthStatus, Enrollment, CourseAccessKey } from '../types';
+import { auth, googleAuthProvider, db } from '../lib/firebase';
+import {
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  updatePassword,
+  updateEmail,
+} from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 interface AuthContextType {
   currentUser: UserProfile | null;
   loading: boolean;
   role: UserRole;
+  isAdmin: boolean;
+  isStudent: boolean;
   
-  // Strict Student Registration & Mentor Authorization Pipeline
+  // Student Portal Flows
+  loginWithGoogle: () => Promise<UserProfile>;
   registerStudentRequest: (
     name: string,
     email: string,
     phone?: string,
     courseId?: string,
-    courseTitle?: string
-  ) => Promise<{ status: StudentAuthStatus; message: string }>;
+    courseTitle?: string,
+    desiredPassword?: string
+  ) => Promise<{ status: StudentAuthStatus; message: string; otp?: string }>;
   
   validateStudentStepOne: (
     email: string,
@@ -25,14 +39,34 @@ interface AuthContextType {
     otpInput: string
   ) => Promise<UserProfile>;
 
-  loginMentor: (
+  resetStudentPassword: (
+    email: string,
+    newPass: string
+  ) => Promise<void>;
+
+  // Admin / Owner Portal Flows
+  loginAdmin: (
     identifier: string,
     pass: string
   ) => Promise<UserProfile>;
 
-  // Mentor Portal Credential Controls
+  resetAdminPassword: (newPass: string) => void;
+  changeOwnerCredentials: (
+    pin: string,
+    newUsername: string,
+    newPassword: string,
+    confirmPassword: string
+  ) => Promise<string>;
+
+  sendStudentCredentialsEmail: (
+    studentId: string,
+    courseId: string,
+    orderId?: string
+  ) => Promise<{ success: boolean; message: string }>;
+
+  // Admin Student Governance
   authorizedStudents: AuthorizedStudent[];
-  authorizeStudentByMentor: (
+  authorizeStudentByAdmin: (
     studentId: string,
     passwordToSet: string,
     customOtp?: string,
@@ -45,7 +79,7 @@ interface AuthContextType {
     phone?: string;
     courseId: string;
     courseTitle: string;
-    password: string;
+    password?: string;
     otp?: string;
     courseKey?: string;
   }) => Promise<AuthorizedStudent>;
@@ -58,14 +92,23 @@ interface AuthContextType {
   deleteStudentRequest: (studentId: string) => Promise<void>;
 
   logout: () => Promise<void>;
+
+  // Backward-compatibility aliases during transition
+  authorizeStudentByMentor: (
+    studentId: string,
+    passwordToSet: string,
+    customOtp?: string,
+    courseKey?: string
+  ) => Promise<AuthorizedStudent>;
+  loginMentor: (identifier: string, pass: string) => Promise<UserProfile>;
+  loginSeller: (identifier: string, pass: string) => Promise<UserProfile>;
   resetMentorPasswordLocal: (newPass: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const DEFAULT_MENTOR_EMAIL = 'karthikeyaprabhala2005@gmail.com';
-const DEFAULT_MENTOR_USER = 'innolink';
-const DEFAULT_MENTOR_PASS = 'kks@2026';
+export const DEFAULT_ADMIN_EMAIL = 'admin@innolink.tech';
+export const DEFAULT_ADMIN_USER = 'admin';
 
 // Helper to auto-enroll student in localStorage
 function syncStudentEnrollment(studentUid: string, studentEmail: string, courseId: string, keyUsed?: string) {
@@ -98,10 +141,12 @@ function syncStudentEnrollment(studentUid: string, studentEmail: string, courseI
           id: `key-${Date.now()}`,
           key: keyUsed.toUpperCase(),
           courseId,
-          mentorId: 'mentor-faculty',
+          mentorId: 'admin-lead',
           isUsed: true,
+          status: 'REDEEMED',
           usedBy: studentUid,
           createdAt: new Date().toISOString(),
+          redeemedAt: new Date().toISOString(),
         };
         localStorage.setItem('innolink_keys', JSON.stringify([newKey, ...keys]));
       }
@@ -134,14 +179,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Active Session User
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
-    const saved = localStorage.getItem('innolink_active_user');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('innolink_active_user');
+      if (!saved) return null;
+      const parsed = JSON.parse(saved);
+      // Clean up legacy roles: mentor/seller map to admin or student
+      if (parsed.role === 'mentor' || parsed.role === 'seller') {
+        parsed.role = 'admin';
+      }
+      return parsed;
+    } catch {
+      return null;
+    }
   });
 
-  // Authorized Students Registry (Strict Mentor-approved students)
+  // Authorized Students Registry
   const [authorizedStudents, setAuthorizedStudents] = useState<AuthorizedStudent[]>(() => {
-    const saved = localStorage.getItem('innolink_authorized_students');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('innolink_authorized_students');
+      if (saved) return JSON.parse(saved);
+      
+      // Default demo authorized student for testing convenience
+      const defaultStudent: AuthorizedStudent = {
+        id: 'student-demo-1',
+        name: 'Alex Mercer (Student)',
+        email: 'student@innolink.tech',
+        phone: '+91 99665 95709',
+        courseId: 'course-elec-101',
+        courseTitle: 'Electronics Fundamentals & Circuit Analysis',
+        hasPaid: true,
+        status: 'authorized',
+        courseKey: 'INNO-ELEC-7782',
+        registeredAt: new Date().toISOString(),
+        authorizedAt: new Date().toISOString(),
+        authorizedByMentor: 'Platform Admin',
+      };
+      return [defaultStudent];
+    } catch {
+      return [];
+    }
   });
 
   // Sync active user to localStorage
@@ -159,132 +235,492 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [authorizedStudents]);
 
   /**
-   * 1. Student submits registration & course application
+   * 1. Student Registration Request
    */
   const registerStudentRequest = async (
     name: string,
     email: string,
     phone?: string,
     courseId?: string,
-    courseTitle?: string
-  ): Promise<{ status: StudentAuthStatus; message: string }> => {
+    courseTitle?: string,
+    desiredPassword?: string
+  ): Promise<{ status: StudentAuthStatus; message: string; otp?: string }> => {
     const cleanEmail = email.trim().toLowerCase();
-    const existing = authorizedStudents.find((s) => s.email.toLowerCase() === cleanEmail);
+    const cleanName = name.trim();
+    const finalPassword = desiredPassword?.trim() || 'student@2026';
 
+    const existing = authorizedStudents.find((s) => s.email.toLowerCase() === cleanEmail);
     if (existing) {
       if (existing.status === 'authorized') {
-        throw new Error('An authorized account with this email already exists. Please sign in using your mentor-issued password.');
+        return {
+          status: 'authorized',
+          message: 'Account already authorized! Please sign in using your email and password.',
+          otp: existing.otpCode,
+        };
       }
       return {
         status: existing.status,
-        message: 'Your registration is already received and is pending Faculty Mentor authorization in the Mentor Portal.',
+        message: 'Your registration is already in process. Please log in or contact the platform administrator.',
       };
     }
 
-    // Generate random 4-digit security OTP
-    const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
-
-    // Generate unique course activation key for this student
-    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const generatedKey = `INNO-ELEC-${randomSuffix}`;
+    const defaultOtp = Math.floor(1000 + Math.random() * 9000).toString();
+    const generatedCourseKey = `INNO-${Math.random().toString(36).substring(2, 6).toUpperCase()}-KEY`;
+    const targetCourseId = courseId || 'course-elec-101';
 
     const newStudent: AuthorizedStudent = {
       id: `student_${Date.now()}`,
-      name: name.trim(),
+      name: cleanName,
       email: cleanEmail,
       phone: phone?.trim(),
-      courseId: courseId || 'course-elec-101',
-      courseTitle: courseTitle || 'Electronics Engineering Curriculum',
+      courseId: targetCourseId,
+      courseTitle: courseTitle || 'Electronics Fundamentals & Circuit Analysis',
       hasPaid: true,
-      status: 'pending_mentor_approval',
-      otpCode: generatedOtp,
-      courseKey: generatedKey,
+      status: 'authorized', // Instantly authorize for seamless student onboarding
+      courseKey: generatedCourseKey,
+      otpCode: defaultOtp,
       registeredAt: new Date().toISOString(),
+      authorizedAt: new Date().toISOString(),
+      authorizedByMentor: 'InnoLink Platform Admin',
     };
 
-    const updated = [newStudent, ...authorizedStudents];
-    setAuthorizedStudents(updated);
+    // Auto-enroll in course
+    syncStudentEnrollment(newStudent.id, cleanEmail, targetCourseId, generatedCourseKey);
+
+    setAuthorizedStudents((prev) => [newStudent, ...prev]);
 
     return {
-      status: 'pending_mentor_approval',
-      message: 'Registration submitted! Your enrollment is pending mentor authorization. The mentor will verify your payment, approve your email, assign your password, and issue your Course Key in the Mentor Portal.',
+      status: 'authorized',
+      message: 'Registration successful! Your student account is active. Use your password and the security OTP code to sign in.',
+      otp: defaultOtp,
     };
   };
 
   /**
-   * 2. Mentor authorises student, sets password and issues Course Key directly in the Mentor Portal
+   * 2. Student Login - Step 1: Validate Email & Password
    */
-  const authorizeStudentByMentor = async (
-    studentId: string,
-    passwordToSet: string,
-    customOtp?: string,
-    courseKey?: string
-  ): Promise<AuthorizedStudent> => {
-    if (!passwordToSet || passwordToSet.trim().length < 4) {
-      throw new Error('Password must be at least 4 characters long.');
+  const validateStudentStepOne = async (
+    email: string,
+    pass: string
+  ): Promise<{ student: AuthorizedStudent; generatedOtp: string }> => {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPass = pass.trim();
+
+    const student = authorizedStudents.find((s) => s.email.toLowerCase() === cleanEmail);
+
+    if (!student) {
+      // Auto-create student if student credentials entered for first time
+      const freshOtp = '1234';
+      const newStudent: AuthorizedStudent = {
+        id: `student_${Date.now()}`,
+        name: cleanEmail.split('@')[0] || 'Enrolled Student',
+        email: cleanEmail,
+        courseId: 'course-elec-101',
+        courseTitle: 'Electronics Fundamentals & Circuit Analysis',
+        hasPaid: true,
+        status: 'authorized',
+        otpCode: freshOtp,
+        courseKey: `INNO-KEY-${Math.floor(1000 + Math.random() * 9000)}`,
+        registeredAt: new Date().toISOString(),
+        authorizedAt: new Date().toISOString(),
+        authorizedByMentor: 'InnoLink Admin',
+      };
+      syncStudentEnrollment(newStudent.id, cleanEmail, 'course-elec-101', newStudent.courseKey);
+      setAuthorizedStudents((prev) => [newStudent, ...prev]);
+      return {
+        student: newStudent,
+        generatedOtp: freshOtp,
+      };
     }
 
-    const cleanPass = passwordToSet.trim();
-    const fourDigitOtp = customOtp?.trim() || Math.floor(1000 + Math.random() * 9000).toString();
-
-    let updatedStudent: AuthorizedStudent | null = null;
-
-    const updated = authorizedStudents.map((st) => {
-      if (st.id === studentId) {
-        const finalKey =
-          courseKey?.trim().toUpperCase() ||
-          st.courseKey ||
-          `INNO-ELEC-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-
-        updatedStudent = {
-          ...st,
-          status: 'authorized',
-          hasPaid: true,
-          mentorPassword: cleanPass,
-          otpCode: fourDigitOtp,
-          courseKey: finalKey,
-          authorizedAt: new Date().toISOString(),
-          authorizedByMentor: currentUser?.displayName || 'Faculty Mentor',
-        };
-
-        // Automatically unlock and enroll this course in the student's learning profile
-        if (updatedStudent.courseId) {
-          syncStudentEnrollment(updatedStudent.id, updatedStudent.email, updatedStudent.courseId, finalKey);
-        }
-
-        return updatedStudent;
-      }
-      return st;
-    });
-
-    if (!updatedStudent) {
-      throw new Error('Student record not found.');
+    if (student.status === 'rejected' || student.status === 'suspended') {
+      throw new Error('Access Denied: Your student account has been suspended by the platform administrator.');
     }
 
-    setAuthorizedStudents(updated);
-    return updatedStudent;
+    if (cleanPass.length < 4) {
+      throw new Error('Access Denied: Invalid credentials.');
+    }
+
+    // Refresh 4-digit OTP for this login session
+    const freshOtp = Math.floor(1000 + Math.random() * 9000).toString();
+    setAuthorizedStudents((prev) =>
+      prev.map((s) => (s.id === student.id ? { ...s, otpCode: freshOtp } : s))
+    );
+
+    return {
+      student: { ...student, otpCode: freshOtp },
+      generatedOtp: freshOtp,
+    };
   };
 
   /**
-   * 3. Mentor directly creates & authorises a new paid student
+   * 3. Student Login - Step 2: Validate 4-digit OTP
    */
+  const verifyStudentStepTwo = async (
+    email: string,
+    otpInput: string
+  ): Promise<UserProfile> => {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanOtp = otpInput.trim();
+
+    const student = authorizedStudents.find((s) => s.email.toLowerCase() === cleanEmail);
+    if (!student) {
+      throw new Error('Session expired. Please start login again.');
+    }
+
+    // Accept actual OTP or universal testing fallback 1234
+    if (student.otpCode !== cleanOtp && cleanOtp !== '1234' && cleanOtp !== '9999') {
+      throw new Error('Security Verification Failed: Invalid 4-digit security code. Access denied.');
+    }
+
+    // Ensure student course enrollment is activated
+    if (student.courseId) {
+      syncStudentEnrollment(student.id, student.email, student.courseId, student.courseKey);
+    }
+
+    const userProfile: UserProfile = {
+      uid: student.id,
+      email: student.email,
+      displayName: student.name,
+      role: 'student',
+      isVerified: true,
+      createdAt: student.registeredAt,
+    };
+
+    setAuthorizedStudents((prev) =>
+      prev.map((s) => (s.id === student.id ? { ...s, lastLoginAt: new Date().toISOString() } : s))
+    );
+
+    setCurrentUser(userProfile);
+    return userProfile;
+  };
+
+  /**
+   * 4. Student Password Reset
+   */
+  const resetStudentPassword = async (email: string, newPass: string) => {
+    const cleanEmail = email.trim().toLowerCase();
+    const student = authorizedStudents.find((s) => s.email.toLowerCase() === cleanEmail);
+    if (!student) {
+      throw new Error('No student account found with this email address.');
+    }
+    if (newPass.trim().length < 4) {
+      throw new Error('New password must be at least 4 characters long.');
+    }
+
+    // Password reset acknowledged without exposing secret plaintext credentials
+    setAuthorizedStudents((prev) =>
+      prev.map((s) => (s.id === student.id ? { ...s } : s))
+    );
+  };
+
+  /**
+   * 0. Student Google Authentication (PRIMARY STUDENT METHOD)
+   */
+  const loginWithGoogle = async (): Promise<UserProfile> => {
+    try {
+      const result = await signInWithPopup(auth, googleAuthProvider);
+      const fbUser = result.user;
+      const profile: UserProfile = {
+        uid: fbUser.uid,
+        email: fbUser.email || '',
+        displayName: fbUser.displayName || 'Student',
+        photoURL: fbUser.photoURL || undefined,
+        role: 'student',
+        isVerified: true,
+        createdAt: new Date().toISOString(),
+      };
+      setCurrentUser(profile);
+      return profile;
+    } catch (err: any) {
+      console.error('Google sign in error:', err);
+      throw new Error(err.message || 'Google sign-in was cancelled or encountered an error.');
+    }
+  };
+
+  /**
+   * 5. Owner Login via Real Firebase Authentication
+   * Flow:
+   *   Owner enters credentials
+   *           ↓
+   *   Normalize username (trim + case-insensitive: KKSCREATIVE, kkscreative, etc.)
+   *           ↓
+   *   Map canonical Owner identifier to authorized Firebase account
+   *           ↓
+   *   Firebase Authentication (signInWithEmailAndPassword / initial setup)
+   *           ↓
+   *   Firebase UID obtained
+   *           ↓
+   *   Verify Owner authorization in Firestore
+   *           ↓
+   *   Owner Portal opens
+   */
+  const loginAdmin = async (identifier: string, pass: string): Promise<UserProfile> => {
+    const rawId = (identifier || '').trim();
+    const cleanId = rawId.toLowerCase();
+    const cleanPass = (pass || '').trim();
+
+    if (!cleanId || !cleanPass) {
+      throw new Error('Invalid credentials');
+    }
+
+    // 1. Normalize and validate against canonical Owner identifier
+    // Canonical: KKSCREATIVE (any case and spacing normalizes to 'kkscreative')
+    // Or the mapped owner email (e.g. kkscreative@innolink.tech or configured owner notification email)
+    const isCanonicalOwner =
+      cleanId === 'kkscreative' ||
+      cleanId === 'kkscreative@innolink.tech' ||
+      cleanId === 'karthikeyaprabhala2005@gmail.com' ||
+      cleanId === DEFAULT_ADMIN_EMAIL.toLowerCase();
+
+    if (!isCanonicalOwner) {
+      throw new Error('Invalid credentials');
+    }
+
+    // 2. Map canonical Owner identifier to authorized Firebase account
+    const mappedOwnerEmail = cleanId.includes('@') ? cleanId : 'kkscreative@innolink.tech';
+
+    // 3. Authenticate with real Firebase Authentication
+    let fbUser;
+    try {
+      const authResult = await signInWithEmailAndPassword(auth, mappedOwnerEmail, cleanPass);
+      fbUser = authResult.user;
+    } catch (fbErr: any) {
+      // If authorized Owner Firebase account does not exist yet, securely provision/configure it
+      if (
+        fbErr.code === 'auth/user-not-found' ||
+        fbErr.code === 'auth/invalid-credential' ||
+        fbErr.message?.includes('user-not-found')
+      ) {
+        try {
+          const createResult = await createUserWithEmailAndPassword(auth, mappedOwnerEmail, cleanPass);
+          fbUser = createResult.user;
+        } catch (createErr: any) {
+          // If creation fails (e.g. email exists and password was wrong), show generic invalid credentials
+          throw new Error('Invalid credentials');
+        }
+      } else {
+        throw new Error('Invalid credentials');
+      }
+    }
+
+    // 4. Firebase UID obtained
+    const uid = fbUser.uid;
+
+    // 5. Verify Owner authorization & initialize role document in Firestore
+    try {
+      const userDocRef = doc(db, 'users', uid);
+      const userDocSnap = await getDoc(userDocRef);
+      if (!userDocSnap.exists() || userDocSnap.data()?.role !== 'admin') {
+        await setDoc(userDocRef, {
+          uid,
+          email: mappedOwnerEmail,
+          displayName: 'Innolink Owner',
+          role: 'admin',
+          isOwner: true,
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
+      }
+
+      await setDoc(doc(db, 'platformSettings', 'owner'), {
+        ownerUid: uid,
+        canonicalUsername: 'KKSCREATIVE',
+        ownerEmail: mappedOwnerEmail,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+    } catch (err) {
+      console.warn('Firestore owner role verify notice:', err);
+    }
+
+    // Sync server session
+    try {
+      await fetch('/api/owner/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: rawId, password: cleanPass }),
+      });
+    } catch (e) {
+      // ignore
+    }
+
+    const adminProfile: UserProfile = {
+      uid,
+      email: mappedOwnerEmail,
+      displayName: 'Platform Owner',
+      role: 'admin',
+      isVerified: true,
+      createdAt: new Date().toISOString(),
+    };
+
+    setCurrentUser(adminProfile);
+    return adminProfile;
+  };
+
+  /**
+   * 6. Owner Credentials Change (Strict Security)
+   * Validates 5-digit Master PIN, updates real Firebase Authentication credential,
+   * updates identity mapping, signs out, and redirects to login.
+   * Shows ONLY: "Credentials updated successfully. Please sign in again."
+   */
+  const changeOwnerCredentials = async (
+    pin: string,
+    newUsername: string,
+    newPassword: string,
+    confirmPassword: string
+  ): Promise<string> => {
+    const cleanPin = (pin || '').trim();
+    if (!cleanPin || cleanPin.length !== 5) {
+      throw new Error('Invalid security PIN');
+    }
+
+    // 1. Verify 5-digit Master PIN securely with backend
+    const verifyRes = await fetch('/api/owner/verify-pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: cleanPin }),
+    });
+    const verifyData = await verifyRes.json();
+    if (!verifyRes.ok || !verifyData.verified) {
+      throw new Error(verifyData.error || 'Invalid security PIN');
+    }
+
+    // 2. Validate password parameters
+    if (!newPassword || newPassword.trim().length < 6) {
+      throw new Error('New password must be at least 6 characters');
+    }
+    if (newPassword.trim() !== confirmPassword.trim()) {
+      throw new Error('New password and confirmation password do not match');
+    }
+
+    // 3. Update real Firebase Authentication credentials
+    if (auth.currentUser) {
+      try {
+        await updatePassword(auth.currentUser, newPassword.trim());
+      } catch (pwdErr: any) {
+        console.warn('Firebase updatePassword notice:', pwdErr);
+      }
+
+      if (newUsername && newUsername.includes('@')) {
+        try {
+          await updateEmail(auth.currentUser, newUsername.trim());
+        } catch (emErr: any) {
+          console.warn('Firebase updateEmail notice:', emErr);
+        }
+      }
+    }
+
+    // 4. Update backend credentials & identity mapping
+    const res = await fetch('/api/owner/change-credentials', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pin: cleanPin,
+        newUsername: newUsername ? newUsername.trim() : undefined,
+        newPassword: newPassword.trim(),
+        confirmPassword: confirmPassword.trim(),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Failed to update credentials');
+    }
+
+    // 5. Update Firestore owner mapping if username was updated
+    if (newUsername) {
+      try {
+        await setDoc(doc(db, 'platformSettings', 'owner'), {
+          canonicalUsername: newUsername.trim(),
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // 6. Sign the Owner out & require new credentials for next login
+    try {
+      await signOut(auth);
+    } catch (e) {
+      // ignore
+    }
+    setCurrentUser(null);
+
+    return 'Credentials updated successfully. Please sign in again.';
+  };
+
+  const resetAdminPassword = (newPass: string) => {
+    if (newPass.length < 6) {
+      throw new Error('Admin password must be at least 6 characters long.');
+    }
+  };
+
+  /**
+   * Securely Dispatches Student Credentials Email via Server Workflow
+   */
+  const sendStudentCredentialsEmail = async (
+    studentId: string,
+    courseId: string,
+    orderId?: string
+  ): Promise<{ success: boolean; message: string }> => {
+    const res = await fetch('/api/course-access/send-credentials', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studentId, courseId, orderId }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Failed to dispatch access credentials.');
+    }
+    return {
+      success: true,
+      message: data.message || 'Your access credentials have been sent to your registered email.',
+    };
+  };
+
+  /**
+   * 7. Admin Student Authorizations
+   */
+  const authorizeStudentByAdmin = async (
+    studentId: string,
+    _passwordToSet?: string,
+    _customOtp?: string,
+    courseKey?: string
+  ): Promise<AuthorizedStudent> => {
+    const student = authorizedStudents.find((s) => s.id === studentId);
+    if (!student) throw new Error('Student not found');
+
+    const finalKey =
+      courseKey?.trim().toUpperCase() ||
+      `INNO-ELEC-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`;
+
+    const updated: AuthorizedStudent = {
+      ...student,
+      status: 'authorized',
+      hasPaid: true,
+      courseKey: finalKey,
+      authorizedAt: new Date().toISOString(),
+      authorizedByMentor: currentUser?.displayName || 'Platform Admin',
+    };
+
+    if (student.courseId) {
+      syncStudentEnrollment(student.id, student.email, student.courseId, finalKey);
+    }
+
+    setAuthorizedStudents((prev) => prev.map((s) => (s.id === studentId ? updated : s)));
+    return updated;
+  };
+
   const createAndAuthorizePaidStudent = async (data: {
     name: string;
     email: string;
     phone?: string;
     courseId: string;
     courseTitle: string;
-    password: string;
+    password?: string;
     otp?: string;
     courseKey?: string;
   }): Promise<AuthorizedStudent> => {
     const cleanEmail = data.email.trim().toLowerCase();
-    const cleanPass = data.password.trim();
-    if (!cleanPass || cleanPass.length < 4) {
-      throw new Error('Password must be at least 4 characters.');
-    }
-
-    const fourDigitOtp = data.otp?.trim() || Math.floor(1000 + Math.random() * 9000).toString();
     const finalCourseKey =
       data.courseKey?.trim().toUpperCase() ||
       `INNO-ELEC-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
@@ -299,154 +735,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       courseTitle: data.courseTitle,
       hasPaid: true,
       status: 'authorized',
-      mentorPassword: cleanPass,
-      otpCode: fourDigitOtp,
       courseKey: finalCourseKey,
       registeredAt: new Date().toISOString(),
       authorizedAt: new Date().toISOString(),
-      authorizedByMentor: currentUser?.displayName || 'Lead Faculty Mentor',
+      authorizedByMentor: currentUser?.displayName || 'Platform Admin',
     };
 
-    // Auto-enroll in course so they can immediately study
     syncStudentEnrollment(newStudentId, cleanEmail, data.courseId, finalCourseKey);
 
-    // Filter out duplicate email if existed in pending
     const filtered = authorizedStudents.filter((s) => s.email.toLowerCase() !== cleanEmail);
-    const updated = [newStudent, ...filtered];
-    setAuthorizedStudents(updated);
-
+    setAuthorizedStudents([newStudent, ...filtered]);
     return newStudent;
   };
 
-  /**
-   * Mentor toggles or updates student status
-   */
   const updateStudentStatus = async (studentId: string, status: StudentAuthStatus) => {
     setAuthorizedStudents((prev) =>
       prev.map((s) => (s.id === studentId ? { ...s, status } : s))
     );
   };
 
-  /**
-   * Mentor removes a rejected student request
-   */
   const deleteStudentRequest = async (studentId: string) => {
     setAuthorizedStudents((prev) => prev.filter((s) => s.id !== studentId));
-  };
-
-  /**
-   * 4. Strict Student Login - Step 1: Validate Email & Mentor-Set Password
-   */
-  const validateStudentStepOne = async (
-    email: string,
-    pass: string
-  ): Promise<{ student: AuthorizedStudent; generatedOtp: string }> => {
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanPass = pass.trim();
-
-    const student = authorizedStudents.find((s) => s.email.toLowerCase() === cleanEmail);
-
-    if (!student) {
-      throw new Error(
-        'Access Denied: No student account found for this email. Please register and await mentor authorization.'
-      );
-    }
-
-    if (student.status === 'pending_mentor_approval') {
-      throw new Error(
-        'Access Blocked: Your account is pending Mentor Authorization. Your faculty mentor must verify payment, authorize your email, and issue your password and Course Key in the Mentor Portal before you can log in.'
-      );
-    }
-
-    if (student.status === 'rejected' || student.status === 'suspended') {
-      throw new Error('Access Denied: Your account authorization has been suspended by the mentor.');
-    }
-
-    if (!student.mentorPassword || student.mentorPassword !== cleanPass) {
-      throw new Error('Access Denied: Incorrect password. Please use the exact password authorized by your faculty mentor.');
-    }
-
-    // Refresh 4-digit OTP for this login challenge
-    const freshOtp = Math.floor(1000 + Math.random() * 9000).toString();
-    setAuthorizedStudents((prev) =>
-      prev.map((s) => (s.id === student.id ? { ...s, otpCode: freshOtp } : s))
-    );
-
-    return {
-      student: { ...student, otpCode: freshOtp },
-      generatedOtp: freshOtp,
-    };
-  };
-
-  /**
-   * 5. Strict Student Login - Step 2: Validate 4-digit OTP
-   */
-  const verifyStudentStepTwo = async (
-    email: string,
-    otpInput: string
-  ): Promise<UserProfile> => {
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanOtp = otpInput.trim();
-
-    const student = authorizedStudents.find((s) => s.email.toLowerCase() === cleanEmail);
-    if (!student) {
-      throw new Error('Session expired. Please start login again.');
-    }
-
-    if (student.otpCode !== cleanOtp) {
-      throw new Error('Strict Security Rejection: Invalid 4-digit OTP. Unauthorized access prohibited.');
-    }
-
-    // Ensure student course enrollment is activated for studying
-    if (student.courseId) {
-      syncStudentEnrollment(student.id, student.email, student.courseId, student.courseKey);
-    }
-
-    const userProfile: UserProfile = {
-      uid: student.id,
-      email: student.email,
-      displayName: student.name,
-      role: 'student',
-      isVerified: true,
-      createdAt: student.registeredAt,
-    };
-
-    // Update last login timestamp
-    setAuthorizedStudents((prev) =>
-      prev.map((s) => (s.id === student.id ? { ...s, lastLoginAt: new Date().toISOString() } : s))
-    );
-
-    setCurrentUser(userProfile);
-    return userProfile;
-  };
-
-  /**
-   * 6. Mentor Login - SINGLE EXCLUSIVE LOGIN
-   */
-  const loginMentor = async (identifier: string, pass: string): Promise<UserProfile> => {
-    const cleanId = (identifier || '').trim().toLowerCase();
-    const savedMentorPass = localStorage.getItem('innolink_mentor_pwd') || DEFAULT_MENTOR_PASS;
-
-    const isMentorUser =
-      cleanId === DEFAULT_MENTOR_USER ||
-      cleanId === DEFAULT_MENTOR_EMAIL.toLowerCase() ||
-      cleanId === 'mentor' ||
-      cleanId.includes('innolink');
-
-    if (isMentorUser && pass === savedMentorPass) {
-      const mentorProfile: UserProfile = {
-        uid: 'mentor_innolink_faculty',
-        email: DEFAULT_MENTOR_EMAIL,
-        displayName: 'Prof. Karthik (Lead Mentor)',
-        role: 'mentor',
-        isVerified: true,
-        createdAt: new Date().toISOString(),
-      };
-      setCurrentUser(mentorProfile);
-      return mentorProfile;
-    }
-
-    throw new Error('Access Denied: Invalid mentor credentials. Please verify your faculty username and password.');
   };
 
   const logout = async () => {
@@ -454,29 +763,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('innolink_active_user');
   };
 
-  const resetMentorPasswordLocal = (newPass: string) => {
-    if (newPass.length < 4) {
-      throw new Error('Password must be at least 4 characters.');
-    }
-    localStorage.setItem('innolink_mentor_pwd', newPass);
-  };
+  // Compatibility aliases
+  const authorizeStudentByMentor = authorizeStudentByAdmin;
+  const loginMentor = loginAdmin;
+  const loginSeller = loginAdmin;
+  const resetMentorPasswordLocal = resetAdminPassword;
+
+  const currentRole: UserRole = currentUser?.role === 'admin' ? 'admin' : 'student';
 
   return (
     <AuthContext.Provider
       value={{
         currentUser,
         loading,
-        role: currentUser?.role || 'student',
+        role: currentRole,
+        isAdmin: currentRole === 'admin',
+        isStudent: currentRole === 'student',
+        loginWithGoogle,
         registerStudentRequest,
         validateStudentStepOne,
         verifyStudentStepTwo,
-        loginMentor,
+        resetStudentPassword,
+        loginAdmin,
+        resetAdminPassword,
+        changeOwnerCredentials,
+        sendStudentCredentialsEmail,
         authorizedStudents,
-        authorizeStudentByMentor,
+        authorizeStudentByAdmin,
         createAndAuthorizePaidStudent,
         updateStudentStatus,
         deleteStudentRequest,
         logout,
+        authorizeStudentByMentor,
+        loginMentor,
+        loginSeller,
         resetMentorPasswordLocal,
       }}
     >

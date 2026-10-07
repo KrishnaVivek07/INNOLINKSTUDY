@@ -1,41 +1,61 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useMarketplace } from '../context/MarketplaceContext';
+import { useBranding } from '../context/BrandingContext';
+import { useTheme } from '../context/ThemeContext';
 import { PWAInstallButton } from './PWAInstallButton';
 import { ThemeSelector } from './ThemeSelector';
+import { TermsModal } from './terms/TermsModal';
+import { getTermsAndConditions } from '../services/termsService';
+import { TermsAndConditions } from '../types';
 import {
   Cpu,
   LogOut,
   User,
   BookOpen,
   LayoutDashboard,
-  Upload,
-  ClipboardCheck,
   Menu,
   X,
-  Play,
-  Lock,
+  ShoppingCart,
+  ShoppingBag,
+  Code,
+  Shield,
+  FileCheck,
+  FileText,
+  Sun,
+  Moon,
+  Laptop,
 } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  openAuthModal: (mode: 'student_login' | 'mentor_login' | 'register') => void;
-  onReplayIntro?: () => void;
+  openAuthModal: (mode: 'student_login' | 'admin_login' | 'register') => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
   openAuthModal,
-  onReplayIntro,
 }) => {
-  const { currentUser, role, logout } = useAuth();
+  const { currentUser, isAdmin, logout } = useAuth();
+  const { cartCount } = useMarketplace();
+  const { branding } = useBranding();
+  const { theme, setTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [termsModalOpen, setTermsModalOpen] = useState(false);
+  const [termsData, setTermsData] = useState<TermsAndConditions | null>(null);
+
+  const handleOpenTerms = async () => {
+    setUserDropdownOpen(false);
+    setMobileMenuOpen(false);
+    const t = await getTermsAndConditions();
+    setTermsData(t);
+    setTermsModalOpen(true);
+  };
 
   const isAuthenticated = !!currentUser;
-  const isMentor = isAuthenticated && role === 'mentor';
-  const isStudent = isAuthenticated && role === 'student';
 
   const handleNavClick = (tab: string) => {
     setActiveTab(tab);
@@ -48,153 +68,121 @@ export const Navbar: React.FC<NavbarProps> = ({
     setActiveTab('home');
   };
 
+  const getNavBtnClasses = (tabName: string) => {
+    const isActive = activeTab === tabName;
+    return `px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
+      isActive
+        ? 'bg-[var(--surface-secondary)] text-[var(--foreground)] font-semibold shadow-xs border border-[var(--border)]'
+        : 'text-[var(--muted-text)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)]'
+    }`;
+  };
+
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-800/60 bg-slate-950/80 backdrop-blur-md">
+    <header className="sticky top-0 z-40 w-full border-b border-[var(--header-border)] bg-[var(--header-background)] text-[var(--header-text)] backdrop-blur-md transition-colors duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14">
-          {/* Logo */}
+          {/* Logo with proper aspect-ratio and object-contain */}
           <div
             onClick={() => handleNavClick('home')}
             className="flex items-center gap-2.5 cursor-pointer group select-none shrink-0"
           >
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-cyan-600 to-emerald-600 p-0.5 shadow-md shadow-cyan-500/10 group-hover:scale-105 transition-transform">
-              <div className="h-full w-full rounded-[6px] bg-slate-950 flex items-center justify-center">
-                <Cpu className="w-4 h-4 text-cyan-400" />
+            {branding.logoUrl ? (
+              <img
+                src={branding.logoUrl}
+                alt={branding.platformName}
+                className="h-8 max-h-8 w-auto max-w-[130px] object-contain rounded-md"
+              />
+            ) : (
+              <div
+                className="h-8 w-8 rounded-lg p-0.5 shadow-xs flex items-center justify-center text-white shrink-0"
+                style={{ backgroundColor: branding.primaryAccent || '#10B981' }}
+              >
+                <Cpu className="w-4 h-4 text-white" />
               </div>
-            </div>
+            )}
             <div className="flex items-center tracking-tight font-bold text-sm sm:text-base">
-              <span className="text-white">InnoLink</span>
-              <span className="text-cyan-400 ml-1">Tech</span>
+              <span className="text-[var(--header-text)]">{branding.shortName || branding.platformName}</span>
+              {branding.shortName && branding.shortName !== branding.platformName && (
+                <span className="text-[var(--muted-text)] ml-1 font-normal hidden sm:inline text-xs">
+                  {branding.platformName.replace(branding.shortName, '').trim()}
+                </span>
+              )}
             </div>
           </div>
 
           {/* Desktop Navigation Links */}
           <nav className="hidden md:flex items-center gap-1">
-            {/* PUBLIC NAVIGATION (When NOT logged in) */}
+            {/* PUBLIC NAVIGATION */}
             {!isAuthenticated && (
               <>
-                <button
-                  onClick={() => handleNavClick('home')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
-                    activeTab === 'home'
-                      ? 'text-cyan-400 bg-cyan-500/10 font-semibold'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
-                  }`}
-                >
+                <button onClick={() => handleNavClick('home')} className={getNavBtnClasses('home')}>
                   Home
                 </button>
-                <button
-                  onClick={() => handleNavClick('courses')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
-                    activeTab === 'courses'
-                      ? 'text-cyan-400 bg-cyan-500/10 font-semibold'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
-                  }`}
-                >
+                <button onClick={() => handleNavClick('courses')} className={getNavBtnClasses('courses')}>
                   Courses
+                </button>
+                <button onClick={() => handleNavClick('coding_lab')} className={getNavBtnClasses('coding_lab')}>
+                  <Code className="w-3.5 h-3.5" />
+                  <span>Coding Lab</span>
+                </button>
+                <button onClick={() => handleNavClick('marketplace')} className={getNavBtnClasses('marketplace')}>
+                  <ShoppingBag className="w-3.5 h-3.5" />
+                  <span>STEM Store</span>
                 </button>
               </>
             )}
 
-            {/* STUDENT NAVIGATION (Only when student is authenticated) */}
-            {isStudent && (
+            {/* STUDENT NAVIGATION */}
+            {isAuthenticated && !isAdmin && (
               <>
-                <button
-                  onClick={() => handleNavClick('home')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
-                    activeTab === 'home'
-                      ? 'text-cyan-400 bg-cyan-500/10 font-semibold'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
-                  }`}
-                >
+                <button onClick={() => handleNavClick('home')} className={getNavBtnClasses('home')}>
                   Home
                 </button>
-                <button
-                  onClick={() => handleNavClick('courses')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
-                    activeTab === 'courses'
-                      ? 'text-cyan-400 bg-cyan-500/10 font-semibold'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
-                  }`}
-                >
+                <button onClick={() => handleNavClick('courses')} className={getNavBtnClasses('courses')}>
                   Courses
                 </button>
-                <button
-                  onClick={() => handleNavClick('student_dashboard')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
-                    activeTab === 'student_dashboard'
-                      ? 'text-cyan-400 bg-cyan-500/10 font-semibold'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
-                  }`}
-                >
+                <button onClick={() => handleNavClick('student_dashboard')} className={getNavBtnClasses('student_dashboard')}>
                   My Learning
                 </button>
-                <button
-                  onClick={() => handleNavClick('student_tests')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
-                    activeTab === 'student_tests'
-                      ? 'text-cyan-400 bg-cyan-500/10 font-semibold'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
-                  }`}
-                >
-                  Tests
+                <button onClick={() => handleNavClick('coding_lab')} className={getNavBtnClasses('coding_lab')}>
+                  <Code className="w-3.5 h-3.5" />
+                  <span>Coding Lab</span>
+                </button>
+                <button onClick={() => handleNavClick('student_tests')} className={getNavBtnClasses('student_tests')}>
+                  <FileCheck className="w-3.5 h-3.5" />
+                  <span>Tests</span>
+                </button>
+                <button onClick={() => handleNavClick('marketplace')} className={getNavBtnClasses('marketplace')}>
+                  <ShoppingBag className="w-3.5 h-3.5" />
+                  <span>STEM Store</span>
                 </button>
               </>
             )}
 
-            {/* MENTOR NAVIGATION (Only when faculty mentor is authenticated) */}
-            {isMentor && (
+            {/* ADMIN NAVIGATION */}
+            {isAdmin && (
               <>
                 <button
-                  onClick={() => handleNavClick('mentor_dashboard')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
-                    activeTab === 'mentor_dashboard'
-                      ? 'text-emerald-400 bg-emerald-500/10 font-semibold'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
+                  onClick={() => handleNavClick('admin_dashboard')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                    activeTab === 'admin_dashboard'
+                      ? 'bg-[var(--foreground)] text-[var(--background)] shadow-xs'
+                      : 'text-[var(--foreground)] hover:bg-[var(--surface-secondary)]'
                   }`}
                 >
-                  Dashboard
+                  <Shield className="w-3.5 h-3.5" />
+                  <span>Owner Portal</span>
                 </button>
-                <button
-                  onClick={() => handleNavClick('courses')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
-                    activeTab === 'courses'
-                      ? 'text-emerald-400 bg-emerald-500/10 font-semibold'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
-                  }`}
-                >
+                <button onClick={() => handleNavClick('courses')} className={getNavBtnClasses('courses')}>
                   Courses
                 </button>
-                <button
-                  onClick={() => handleNavClick('mentor_upload')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
-                    activeTab === 'mentor_upload'
-                      ? 'text-emerald-400 bg-emerald-500/10 font-semibold'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
-                  }`}
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Upload</span>
+                <button onClick={() => handleNavClick('coding_lab')} className={getNavBtnClasses('coding_lab')}>
+                  <Code className="w-3.5 h-3.5" />
+                  <span>Coding Lab</span>
                 </button>
-                <button
-                  onClick={() => handleNavClick('mentor_tests')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
-                    activeTab === 'mentor_tests'
-                      ? 'text-emerald-400 bg-emerald-500/10 font-semibold'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
-                  }`}
-                >
-                  Tests
-                </button>
-                <button
-                  onClick={() => handleNavClick('mentor_assignments')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
-                    activeTab === 'mentor_assignments'
-                      ? 'text-emerald-400 bg-emerald-500/10 font-semibold'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
-                  }`}
-                >
-                  Submissions
+                <button onClick={() => handleNavClick('marketplace')} className={getNavBtnClasses('marketplace')}>
+                  <ShoppingBag className="w-3.5 h-3.5" />
+                  <span>STEM Store</span>
                 </button>
               </>
             )}
@@ -202,79 +190,124 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Right Action Icons & Profile */}
           <div className="flex items-center gap-2">
-            {/* Replay Intro Video Button */}
-            {onReplayIntro && (
-              <button
-                onClick={onReplayIntro}
-                title="Play Intro Video"
-                className="hidden lg:flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900/70 hover:bg-slate-800 text-slate-300 text-xs transition cursor-pointer"
-              >
-                <Play className="w-3 h-3 text-cyan-400" />
-                <span className="text-[11px]">Intro</span>
-              </button>
-            )}
+            {/* Marketplace Cart Button */}
+            <button
+              onClick={() => handleNavClick('marketplace')}
+              className="relative p-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-secondary)] text-[var(--foreground)] transition cursor-pointer shadow-xs"
+              title="View STEM Hardware Cart"
+            >
+              <ShoppingCart className="w-4 h-4" />
+              {cartCount > 0 && (
+                <span
+                  className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full text-white font-bold text-[9px] shadow-xs"
+                  style={{ backgroundColor: branding.primaryAccent || '#10B981' }}
+                >
+                  {cartCount}
+                </span>
+              )}
+            </button>
 
-            {/* Theme Customizer Switcher: Light / Dark / System */}
+            {/* Theme Selector (Light, Dark, System) */}
             <ThemeSelector />
 
             {/* PWA Install Button */}
             <PWAInstallButton />
 
-            {/* User Profile or Login Buttons */}
+            {/* User Profile or Two Login Buttons */}
             {isAuthenticated ? (
               <div className="relative">
                 <button
                   onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                  className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/60 px-2 py-1 text-xs text-slate-200 hover:border-slate-700 transition cursor-pointer"
+                  className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs text-[var(--foreground)] hover:bg-[var(--surface-secondary)] transition cursor-pointer shadow-xs"
                 >
                   <div
-                    className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] text-white ${
-                      isMentor ? 'bg-emerald-600' : 'bg-cyan-600'
-                    }`}
+                    className="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] text-white"
+                    style={{ backgroundColor: isAdmin ? '#0F172A' : branding.primaryAccent || '#10B981' }}
                   >
                     {currentUser?.displayName?.[0]?.toUpperCase() || 'U'}
                   </div>
-                  <span className="hidden sm:inline font-medium max-w-[90px] truncate text-[11px]">
+                  <span className="hidden sm:inline font-medium max-w-[110px] truncate text-[11px]">
                     {currentUser?.displayName}
                   </span>
                 </button>
 
                 {userDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-800 bg-slate-900 p-2 shadow-2xl z-50 text-slate-200">
-                    <div className="px-2.5 py-1.5 border-b border-slate-800">
-                      <p className="text-xs font-semibold text-white truncate">{currentUser?.displayName}</p>
-                      <p className="text-[10px] text-slate-400 truncate">{currentUser?.email}</p>
+                  <div className="absolute right-0 mt-2 w-60 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2 shadow-xl z-50 text-[var(--foreground)]">
+                    <div className="px-2.5 py-1.5 border-b border-[var(--border)]">
+                      <p className="text-xs font-semibold text-[var(--foreground)] truncate">{currentUser?.displayName}</p>
+                      <p className="text-[10px] text-[var(--muted-text)] truncate">{currentUser?.email}</p>
                       <div className="mt-1 flex items-center gap-1">
-                        <span
-                          className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider ${
-                            isMentor ? 'bg-emerald-500/20 text-emerald-400' : 'bg-cyan-500/20 text-cyan-400'
-                          }`}
-                        >
-                          {isMentor ? 'Lead Faculty Mentor' : 'Student Scholar'}
+                        <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[var(--surface-secondary)] text-[var(--foreground)] border border-[var(--border)]">
+                          {isAdmin ? 'Platform Administrator' : 'Enrolled Student'}
                         </span>
-                        {currentUser?.isVerified && (
-                          <span className="text-[9px] text-emerald-400">✓ Authorized</span>
-                        )}
                       </div>
                     </div>
 
                     <div className="py-1">
                       <button
                         onClick={() => {
-                          handleNavClick(isMentor ? 'mentor_dashboard' : 'student_dashboard');
+                          handleNavClick(isAdmin ? 'admin_dashboard' : 'student_dashboard');
                           setUserDropdownOpen(false);
                         }}
-                        className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-lg transition"
+                        className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-[var(--foreground)] hover:bg-[var(--surface-secondary)] rounded-lg transition"
                       >
-                        <LayoutDashboard className="w-3.5 h-3.5 text-slate-400" />
-                        <span>Dashboard</span>
+                        <LayoutDashboard className="w-3.5 h-3.5 text-[var(--muted-text)]" />
+                        <span>{isAdmin ? 'Owner Portal' : 'Student Dashboard'}</span>
                       </button>
                     </div>
 
-                    <div className="pt-1 border-t border-slate-800">
+                    {/* Profile -> Theme Switcher (Light / Dark / System) */}
+                    <div className="py-2 px-2.5 border-t border-[var(--border)]">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-text)] block mb-1.5">
+                        Interface Theme
+                      </span>
+                      <div className="grid grid-cols-3 gap-1 bg-[var(--surface-secondary)] p-1 rounded-lg border border-[var(--border)]">
+                        <button
+                          type="button"
+                          onClick={() => setTheme('light')}
+                          className={`flex items-center justify-center gap-1 py-1 rounded text-[11px] font-medium transition cursor-pointer ${
+                            theme === 'light'
+                              ? 'bg-[var(--surface)] text-[var(--foreground)] font-bold shadow-xs border border-[var(--border)]'
+                              : 'text-[var(--muted-text)] hover:text-[var(--foreground)]'
+                          }`}
+                          title="Light Mode"
+                        >
+                          <Sun className="w-3 h-3" />
+                          <span>Light</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTheme('dark')}
+                          className={`flex items-center justify-center gap-1 py-1 rounded text-[11px] font-medium transition cursor-pointer ${
+                            theme === 'dark'
+                              ? 'bg-[var(--surface)] text-[var(--foreground)] font-bold shadow-xs border border-[var(--border)]'
+                              : 'text-[var(--muted-text)] hover:text-[var(--foreground)]'
+                          }`}
+                          title="Dark Mode"
+                        >
+                          <Moon className="w-3 h-3" />
+                          <span>Dark</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTheme('system')}
+                          className={`flex items-center justify-center gap-1 py-1 rounded text-[11px] font-medium transition cursor-pointer ${
+                            theme === 'system'
+                              ? 'bg-[var(--surface)] text-[var(--foreground)] font-bold shadow-xs border border-[var(--border)]'
+                              : 'text-[var(--muted-text)] hover:text-[var(--foreground)]'
+                          }`}
+                          title="System Mode (auto follows OS)"
+                        >
+                          <Laptop className="w-3 h-3" />
+                          <span>Auto</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="pt-1 border-t border-[var(--border)]">
                       <button
                         onClick={handleSignOut}
-                        className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-rose-400 hover:bg-rose-950/30 rounded-lg transition cursor-pointer"
+                        className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-rose-500 hover:bg-rose-500/10 rounded-lg transition cursor-pointer"
                       >
                         <LogOut className="w-3.5 h-3.5" />
                         <span>Sign Out</span>
@@ -284,152 +317,26 @@ export const Navbar: React.FC<NavbarProps> = ({
                 )}
               </div>
             ) : (
+              /* ONLY TWO LOGIN BUTTONS (Theme Responsive) */
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => openAuthModal('student_login')}
-                  className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 text-xs font-semibold text-slate-200 transition cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--foreground)] transition cursor-pointer shadow-xs"
                 >
-                  Student Sign In
+                  Student Login
                 </button>
                 <button
-                  onClick={() => openAuthModal('mentor_login')}
-                  className="hidden sm:inline-flex px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white transition cursor-pointer"
+                  onClick={() => openAuthModal('admin_login')}
+                  className="px-3 py-1.5 rounded-lg bg-[var(--foreground)] hover:opacity-90 text-xs font-semibold text-[var(--background)] transition cursor-pointer shadow-xs flex items-center gap-1.5"
                 >
-                  Faculty Mentor
+                  <Shield className="w-3.5 h-3.5" />
+                  <span>Admin Login</span>
                 </button>
               </div>
             )}
-
-            {/* Mobile Menu Trigger */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-900 transition"
-            >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
           </div>
         </div>
       </div>
-
-      {/* Mobile Menu Drawer */}
-      {mobileMenuOpen && (
-        <div className="md:hidden border-b border-slate-800 bg-slate-950 px-4 pt-2 pb-4 space-y-1">
-          <button
-            onClick={() => handleNavClick('home')}
-            className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium ${
-              activeTab === 'home' ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-300'
-            }`}
-          >
-            Home
-          </button>
-          <button
-            onClick={() => handleNavClick('courses')}
-            className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium ${
-              activeTab === 'courses' ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-300'
-            }`}
-          >
-            Courses Catalog
-          </button>
-
-          {isStudent && (
-            <>
-              <button
-                onClick={() => handleNavClick('student_dashboard')}
-                className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium ${
-                  activeTab === 'student_dashboard' ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-300'
-                }`}
-              >
-                My Learning
-              </button>
-              <button
-                onClick={() => handleNavClick('student_tests')}
-                className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium ${
-                  activeTab === 'student_tests' ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-300'
-                }`}
-              >
-                Tests & Quizzes
-              </button>
-            </>
-          )}
-
-          {isMentor && (
-            <>
-              <button
-                onClick={() => handleNavClick('mentor_dashboard')}
-                className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium ${
-                  activeTab === 'mentor_dashboard' ? 'bg-emerald-500/10 text-emerald-400' : 'text-slate-300'
-                }`}
-              >
-                Mentor Dashboard
-              </button>
-              <button
-                onClick={() => handleNavClick('mentor_upload')}
-                className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium ${
-                  activeTab === 'mentor_upload' ? 'bg-emerald-500/10 text-emerald-400' : 'text-slate-300'
-                }`}
-              >
-                Course Builder / Upload
-              </button>
-              <button
-                onClick={() => handleNavClick('mentor_tests')}
-                className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium ${
-                  activeTab === 'mentor_tests' ? 'bg-emerald-500/10 text-emerald-400' : 'text-slate-300'
-                }`}
-              >
-                Create Test
-              </button>
-            </>
-          )}
-
-          {!isAuthenticated && (
-            <div className="pt-2 border-t border-slate-800 flex flex-col gap-2">
-              <button
-                onClick={() => {
-                  openAuthModal('student_login');
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full py-2 rounded-lg bg-cyan-600 text-xs font-semibold text-white"
-              >
-                Student Sign In
-              </button>
-              <button
-                onClick={() => {
-                  openAuthModal('mentor_login');
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full py-2 rounded-lg bg-emerald-600 text-xs font-semibold text-white"
-              >
-                Faculty Mentor Sign In
-              </button>
-            </div>
-          )}
-
-          {isAuthenticated && (
-            <div className="pt-2 border-t border-slate-800">
-              <button
-                onClick={handleSignOut}
-                className="w-full py-2 rounded-lg bg-rose-950/40 text-rose-300 text-xs font-semibold text-left px-3 flex items-center gap-2"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Sign Out ({currentUser?.displayName})</span>
-              </button>
-            </div>
-          )}
-
-          {onReplayIntro && (
-            <button
-              onClick={() => {
-                onReplayIntro();
-                setMobileMenuOpen(false);
-              }}
-              className="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-cyan-400 hover:bg-slate-900 flex items-center gap-2 pt-2 border-t border-slate-800"
-            >
-              <Play className="w-3.5 h-3.5" />
-              <span>Watch Intro Video</span>
-            </button>
-          )}
-        </div>
-      )}
     </header>
   );
 };

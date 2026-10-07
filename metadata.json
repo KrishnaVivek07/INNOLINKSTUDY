@@ -1,6 +1,6 @@
 {
-  "name": "InnoLink Technologies",
-  "description": "Premier electronics and technology learning management system and progressive web app powered by MK Solutions. Learn, build, test, and innovate.",
+  "name": "Innolink Technologies",
+  "description": "Innolink Technologies - Premier electronics LMS, Coding & Hardware Lab, and STEM Marketplace powered by Mk solutions. Learn, build, test, and innovate.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

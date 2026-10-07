@@ -7,49 +7,49 @@ export const ThemeSelector: React.FC = () => {
 
   return (
     <div
-      className="flex items-center p-0.5 rounded-lg border border-slate-800 bg-slate-900/90 text-slate-400"
-      title="Customize Theme: Light / Dark / System"
+      className="flex items-center p-0.5 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--muted-text)] transition-colors duration-200"
+      title="Color Theme: Light / Dark / System (auto)"
     >
       <button
         type="button"
         onClick={() => setTheme('light')}
-        className={`p-1.5 rounded-md transition cursor-pointer flex items-center gap-1 ${
+        className={`px-2 py-1 rounded-md transition cursor-pointer flex items-center gap-1.5 text-xs ${
           theme === 'light'
-            ? 'bg-white text-slate-900 shadow-sm font-semibold'
-            : 'hover:text-slate-200'
+            ? 'bg-[var(--surface)] text-[var(--foreground)] font-semibold shadow-xs border border-[var(--border)]'
+            : 'hover:text-[var(--foreground)]'
         }`}
-        title="Light Mode"
+        title="Light Mode (White / Light Neutral)"
       >
         <Sun className="w-3.5 h-3.5" />
-        <span className="hidden xl:inline text-[10px]">Light</span>
+        <span className="hidden xl:inline text-[11px]">Light</span>
       </button>
 
       <button
         type="button"
         onClick={() => setTheme('dark')}
-        className={`p-1.5 rounded-md transition cursor-pointer flex items-center gap-1 ${
+        className={`px-2 py-1 rounded-md transition cursor-pointer flex items-center gap-1.5 text-xs ${
           theme === 'dark'
-            ? 'bg-slate-800 text-cyan-400 shadow-sm font-semibold'
-            : 'hover:text-slate-200'
+            ? 'bg-[var(--surface)] text-[var(--foreground)] font-semibold shadow-xs border border-[var(--border)]'
+            : 'hover:text-[var(--foreground)]'
         }`}
-        title="Dark Mode"
+        title="Dark Mode (Black / Dark Charcoal)"
       >
         <Moon className="w-3.5 h-3.5" />
-        <span className="hidden xl:inline text-[10px]">Dark</span>
+        <span className="hidden xl:inline text-[11px]">Dark</span>
       </button>
 
       <button
         type="button"
         onClick={() => setTheme('system')}
-        className={`p-1.5 rounded-md transition cursor-pointer flex items-center gap-1 ${
+        className={`px-2 py-1 rounded-md transition cursor-pointer flex items-center gap-1.5 text-xs ${
           theme === 'system'
-            ? 'bg-cyan-600/20 text-cyan-300 shadow-sm font-semibold border border-cyan-500/30'
-            : 'hover:text-slate-200'
+            ? 'bg-[var(--surface)] text-[var(--foreground)] font-semibold shadow-xs border border-[var(--border)]'
+            : 'hover:text-[var(--foreground)]'
         }`}
-        title="System (Auto)"
+        title="System Preference (Automatically follows OS theme)"
       >
         <Laptop className="w-3.5 h-3.5" />
-        <span className="hidden xl:inline text-[10px]">System</span>
+        <span className="hidden xl:inline text-[11px]">System</span>
       </button>
     </div>
   );

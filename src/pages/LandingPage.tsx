@@ -1,157 +1,133 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLMS } from '../context/LMSContext';
+import { useBranding } from '../context/BrandingContext';
 import {
   Cpu,
-  Sparkles,
   Award,
   BookOpen,
   ArrowRight,
   ShieldCheck,
   CheckCircle2,
-  Lock,
   Layers,
-  BarChart3,
-  HelpCircle,
-  MessageSquare,
-  Zap,
-  Play,
-  BrainCircuit,
-  GraduationCap,
+  Sparkles,
+  ShoppingBag,
+  Code,
+  Terminal,
+  Activity,
 } from 'lucide-react';
 
 interface LandingPageProps {
   onNavigate: (tab: string, param?: string) => void;
-  openAuthModal: (mode: 'student_login' | 'mentor_login' | 'register') => void;
+  openAuthModal: (mode: 'student_login' | 'admin_login' | 'register') => void;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, openAuthModal }) => {
   const { currentUser } = useAuth();
   const { courses, isEnrolled } = useLMS();
+  const { branding } = useBranding();
 
   return (
-    <div className="relative min-h-screen text-slate-100 overflow-hidden">
-      {/* Circuit background ambient glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[550px] overflow-hidden pointer-events-none -z-10">
-        <div className="absolute top-12 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute top-24 right-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl" />
-        {/* Subtle SVG Circuit Grid overlay */}
-        <svg className="w-full h-full opacity-10" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="circuit-grid" width="60" height="60" patternUnits="userSpaceOnUse">
-              <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#38bdf8" strokeWidth="0.7" />
-              <circle cx="0" cy="0" r="2" fill="#38bdf8" />
-              <path d="M 30 0 v 30 h 30" fill="none" stroke="#38bdf8" strokeWidth="0.5" strokeDasharray="2,2" />
-              <circle cx="30" cy="30" r="1.5" fill="#34d399" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#circuit-grid)" />
-        </svg>
-      </div>
-
+    <div className="min-h-screen text-[var(--foreground)] bg-[var(--background)] transition-colors duration-200">
       {/* 1. HERO SECTION */}
-      <section className="pt-14 sm:pt-20 pb-16 sm:pb-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center">
-        {/* Badge */}
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-cyan-500/30 bg-cyan-950/40 text-cyan-300 text-xs font-semibold mb-6 shadow-sm">
-          <span className="flex h-2 w-2 rounded-full bg-cyan-400 animate-ping" />
-          <span>Next-Generation Electronics Learning Platform</span>
+      <section className="pt-14 sm:pt-20 pb-14 sm:pb-20 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto text-center">
+        {/* Subtle Category Tag */}
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-text)] text-xs font-medium mb-6 shadow-xs">
+          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: branding.primaryAccent || '#10B981' }} />
+          <span>Electronics Education & Engineering Practice</span>
         </div>
 
-        {/* Brand Main Title */}
-        <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-white mb-4">
-          <span className="block">InnoLink Technologies</span>
-          <span className="block text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-300 to-blue-500 mt-2">
-            Learn Electronics. Build Skills. Create the Future.
-          </span>
+        {/* Clear, Confident Main Title */}
+        <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-[var(--foreground)] mb-4 max-w-3xl mx-auto">
+          Learn Electronics. Build Circuits. Master Embedded Systems.
         </h1>
 
-        {/* Motto */}
-        <p className="text-base sm:text-xl font-medium text-slate-300 max-w-2xl mx-auto mb-8 leading-relaxed">
-          Learn. Build. Test. Innovate.
+        {/* Professional Subtitle */}
+        <p className="text-sm sm:text-base text-[var(--muted-text)] max-w-2xl mx-auto mb-8 leading-relaxed">
+          {branding.platformName} provides university-grade electronics curriculum, virtual microcontroller labs for ESP32, Arduino, and Pico, and verified STEM kits.
         </p>
 
-        {/* Hero Action Buttons */}
-        <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 max-w-lg mx-auto">
+        {/* Clean Action Buttons */}
+        <div className="flex flex-wrap items-center justify-center gap-3 max-w-md mx-auto">
           <button
             onClick={() => onNavigate('courses')}
-            className="flex-1 min-w-[150px] sm:flex-none px-6 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold text-sm sm:text-base hover:from-cyan-400 hover:to-blue-500 shadow-xl shadow-cyan-500/25 transition cursor-pointer flex items-center justify-center gap-2"
+            className="flex-1 min-w-[140px] sm:flex-none px-5 py-2.5 rounded-lg bg-[var(--foreground)] hover:opacity-90 text-[var(--background)] font-medium text-sm transition cursor-pointer flex items-center justify-center gap-2 shadow-xs"
           >
             <span>Explore Courses</span>
             <ArrowRight className="w-4 h-4" />
           </button>
 
-          {!currentUser ? (
-            <>
-              <button
-                onClick={() => openAuthModal('student_login')}
-                className="flex-1 min-w-[140px] sm:flex-none px-6 py-3 rounded-2xl border border-slate-700 bg-slate-900/80 text-slate-200 font-semibold text-sm sm:text-base hover:border-slate-500 hover:text-white transition cursor-pointer"
-              >
-                Student Login
-              </button>
+          <button
+            onClick={() => onNavigate('coding_lab')}
+            className="flex-1 min-w-[140px] sm:flex-none px-5 py-2.5 rounded-lg bg-[var(--surface)] border border-[var(--border)] hover:bg-[var(--surface-secondary)] text-[var(--foreground)] font-medium text-sm transition cursor-pointer flex items-center justify-center gap-2 shadow-xs"
+          >
+            <Code className="w-4 h-4 text-[var(--muted-text)]" />
+            <span>Virtual Lab</span>
+          </button>
 
-              <button
-                onClick={() => openAuthModal('mentor_login')}
-                className="flex-1 min-w-[140px] sm:flex-none px-6 py-3 rounded-2xl border border-emerald-500/40 bg-emerald-950/40 text-emerald-300 font-semibold text-sm sm:text-base hover:bg-emerald-900/50 hover:border-emerald-400 transition cursor-pointer"
-              >
-                Mentor Login
-              </button>
-            </>
+          {!currentUser ? (
+            <button
+              onClick={() => openAuthModal('student_login')}
+              className="flex-1 min-w-[140px] sm:flex-none px-5 py-2.5 rounded-lg bg-[var(--surface)] border border-[var(--border)] hover:bg-[var(--surface-secondary)] text-[var(--foreground)] font-medium text-sm transition cursor-pointer shadow-xs"
+            >
+              Student Sign In
+            </button>
           ) : (
             <button
-              onClick={() => onNavigate(currentUser.role === 'mentor' ? 'mentor_dashboard' : 'student_dashboard')}
-              className="flex-1 min-w-[180px] sm:flex-none px-6 py-3 rounded-2xl bg-slate-800 text-cyan-300 border border-cyan-500/40 font-semibold text-sm sm:text-base hover:bg-slate-700 transition cursor-pointer flex items-center justify-center gap-2"
+              onClick={() => onNavigate(currentUser.role === 'admin' ? 'admin_dashboard' : 'student_dashboard')}
+              className="flex-1 min-w-[140px] sm:flex-none px-5 py-2.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] text-[var(--foreground)] hover:opacity-80 font-medium text-sm transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
             >
-              <span>Go to Your {currentUser.role === 'mentor' ? 'Mentor' : 'Student'} Dashboard</span>
-              <ArrowRight className="w-4 h-4" />
+              <span>{currentUser.role === 'admin' ? 'Owner Portal' : 'My Learning'}</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
 
-        {/* Hardware Pillar Highlights */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-16 max-w-5xl mx-auto pt-8 border-t border-slate-800/60">
-          <div className="p-4 rounded-2xl bg-slate-900/40 border border-slate-800/80 text-left">
-            <Cpu className="w-5 h-5 text-cyan-400 mb-2" />
-            <div className="text-sm font-bold text-white">Circuit Mastery</div>
-            <div className="text-xs text-slate-400 mt-1">From DC basics to high-frequency RF routing</div>
+        {/* Technical Highlights */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 mt-14 text-left">
+          <div className="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
+            <Cpu className="w-5 h-5 text-[var(--muted-text)] mb-2" />
+            <div className="text-sm font-semibold text-[var(--foreground)]">Circuit Fundamentals</div>
+            <div className="text-xs text-[var(--muted-text)] mt-1">From Ohm's law to BJT amplifiers and filtering</div>
           </div>
-          <div className="p-4 rounded-2xl bg-slate-900/40 border border-slate-800/80 text-left">
-            <BrainCircuit className="w-5 h-5 text-emerald-400 mb-2" />
-            <div className="text-sm font-bold text-white">Gemini AI Tutor</div>
-            <div className="text-xs text-slate-400 mt-1">Contextual Q&A and instant video summaries</div>
+          <div className="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
+            <Terminal className="w-5 h-5 text-[var(--muted-text)] mb-2" />
+            <div className="text-sm font-semibold text-[var(--foreground)]">Microcontroller Lab</div>
+            <div className="text-xs text-[var(--muted-text)] mt-1">Arduino Uno, ESP32 Wi-Fi, and RP2040 Pico</div>
           </div>
-          <div className="p-4 rounded-2xl bg-slate-900/40 border border-slate-800/80 text-left">
-            <ShieldCheck className="w-5 h-5 text-blue-400 mb-2" />
-            <div className="text-sm font-bold text-white">Faculty Guided</div>
-            <div className="text-xs text-slate-400 mt-1">Lead engineer reviews, grading & code notes</div>
+          <div className="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
+            <ShieldCheck className="w-5 h-5 text-[var(--muted-text)] mb-2" />
+            <div className="text-sm font-semibold text-[var(--foreground)]">Mentor Reviewed</div>
+            <div className="text-xs text-[var(--muted-text)] mt-1">Faculty assessment, grading, and schematic reviews</div>
           </div>
-          <div className="p-4 rounded-2xl bg-slate-900/40 border border-slate-800/80 text-left">
-            <Award className="w-5 h-5 text-amber-400 mb-2" />
-            <div className="text-sm font-bold text-white">PWA & Certifications</div>
-            <div className="text-xs text-slate-400 mt-1">Install on desktop/mobile + verified certificates</div>
+          <div className="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
+            <ShoppingBag className="w-5 h-5 text-[var(--muted-text)] mb-2" />
+            <div className="text-sm font-semibold text-[var(--foreground)]">STEM Store</div>
+            <div className="text-xs text-[var(--muted-text)] mt-1">Direct hardware kits matching each lab course</div>
           </div>
         </div>
       </section>
 
       {/* 2. FEATURED COURSES SECTION */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10">
+      <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 pb-3 border-b border-[var(--border)]">
           <div>
-            <div className="text-xs font-bold uppercase tracking-wider text-cyan-400 mb-1">
+            <div className="text-xs font-semibold uppercase tracking-wider text-[var(--muted-text)] mb-1">
               Curriculum Catalog
             </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
+            <h2 className="text-xl sm:text-2xl font-bold text-[var(--foreground)] tracking-tight">
               Featured Electronics Courses
             </h2>
-            <p className="text-sm text-slate-400 mt-1 max-w-xl">
-              Practical, syllabus-aligned courses with video demonstrations, schematic exercises, and mentor-evaluated labs.
+            <p className="text-xs sm:text-sm text-[var(--muted-text)] mt-1">
+              Hands-on courses with step-by-step video lectures, schematic analysis, and lab challenges.
             </p>
           </div>
           <button
             onClick={() => onNavigate('courses')}
-            className="mt-4 sm:mt-0 text-sm font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1.5 transition cursor-pointer"
+            className="mt-3 sm:mt-0 text-xs sm:text-sm font-semibold text-[var(--foreground)] hover:underline flex items-center gap-1 transition cursor-pointer"
           >
-            <span>Browse Full Catalog ({courses.length})</span>
-            <ArrowRight className="w-4 h-4" />
+            <span>All Courses ({courses.length})</span>
+            <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
@@ -161,52 +137,51 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, openAuthMo
             return (
               <div
                 key={course.id}
-                className="group rounded-3xl border border-slate-800 bg-slate-900/70 overflow-hidden flex flex-col hover:border-slate-700 transition-all duration-300 hover:-translate-y-1 shadow-lg"
+                className="group rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden flex flex-col shadow-xs hover:border-[var(--muted-text)] transition-all duration-200"
               >
-                {/* Cover Image */}
-                <div className="relative h-48 w-full overflow-hidden bg-slate-950">
+                {/* Real Course Thumbnail */}
+                <div className="relative h-44 w-full overflow-hidden bg-[var(--surface-secondary)]">
                   <img
                     src={course.coverImage}
                     alt={course.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90"
+                    className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent" />
-                  <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-950/80 text-cyan-300 border border-slate-700/80 backdrop-blur-sm">
+                  <span className="absolute top-3 left-3 px-2 py-0.5 rounded text-[10px] font-semibold bg-[var(--surface)] text-[var(--foreground)] border border-[var(--border)] shadow-xs">
                     {course.category}
                   </span>
                   {enrolled ? (
-                    <span className="absolute top-3 right-3 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-950/90 text-emerald-300 border border-emerald-500/40">
+                    <span className="absolute top-3 right-3 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
                       ✓ Enrolled
                     </span>
                   ) : (
-                    <span className="absolute top-3 right-3 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-950/80 text-slate-300 border border-slate-800">
+                    <span className="absolute top-3 right-3 px-2 py-0.5 rounded text-[10px] font-semibold bg-[var(--foreground)] text-[var(--background)]">
                       ${course.price}
                     </span>
                   )}
                 </div>
 
                 {/* Content */}
-                <div className="p-5 flex-1 flex flex-col justify-between">
+                <div className="p-4 flex-1 flex flex-col justify-between">
                   <div>
-                    <h3 className="text-base font-bold text-white group-hover:text-cyan-400 transition-colors line-clamp-1">
+                    <h3 className="text-sm sm:text-base font-semibold text-[var(--foreground)] line-clamp-1">
                       {course.title}
                     </h3>
-                    <p className="text-xs text-slate-400 mt-2 line-clamp-2 leading-relaxed">
+                    <p className="text-xs text-[var(--muted-text)] mt-1.5 line-clamp-2 leading-relaxed">
                       {course.description}
                     </p>
 
-                    <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                    <div className="mt-4 pt-3 border-t border-[var(--border)] flex items-center justify-between text-xs text-[var(--muted-text)]">
                       <span>{course.duration}</span>
-                      <span className="text-slate-300 font-medium">{course.level}</span>
+                      <span className="text-[var(--foreground)] font-medium">{course.level}</span>
                     </div>
                   </div>
 
-                  <div className="mt-5">
+                  <div className="mt-4">
                     <button
                       onClick={() => onNavigate('course_details', course.id)}
-                      className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-cyan-600 text-xs font-semibold text-white transition cursor-pointer flex items-center justify-center gap-1.5"
+                      className="w-full py-2 rounded-lg bg-[var(--foreground)] hover:opacity-90 text-xs font-medium text-[var(--background)] transition cursor-pointer flex items-center justify-center gap-1.5"
                     >
-                      <span>{enrolled ? 'Continue Course' : 'View Course & Curriculum'}</span>
+                      <span>{enrolled ? 'Continue Course' : 'View Syllabus & Enroll'}</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -217,237 +192,142 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate, openAuthMo
         </div>
       </section>
 
-      {/* 3. HOW LEARNING WORKS */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-slate-800/60">
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <div className="text-xs font-bold uppercase tracking-wider text-cyan-400 mb-1">
-            Proven Methodology
+      {/* 3. VIRTUAL LAB & HARDWARE ENVIRONMENT PREVIEW */}
+      <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
+        <div className="p-6 sm:p-8 rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-xs">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[11px] font-semibold bg-[var(--surface-secondary)] text-[var(--foreground)] border border-[var(--border)] mb-3">
+                <Code className="w-3 h-3 text-[var(--muted-text)]" />
+                <span>Integrated Engineering Environment</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-bold text-[var(--foreground)] tracking-tight mb-3">
+                Virtual Hardware & Real-Time Code Simulation
+              </h2>
+              <p className="text-xs sm:text-sm text-[var(--muted-text)] leading-relaxed mb-5">
+                Experiment before touching physical hardware. Write Arduino C/C++ or MicroPython, build with visual blocks, monitor GPIO pin states, and simulate HC-SR04 ultrasonic sensors, OLEDs, and servos in real time.
+              </p>
+
+              <div className="space-y-2.5 text-xs text-[var(--foreground)] mb-6">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <span>ESP32 NodeMCU, Arduino Uno R3, and Raspberry Pi Pico RP2040</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <span>Dual Code & Block programming with instant board code generation</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <span>Live Serial Monitor (115200 / 9600 baud) and interactive I/O controls</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => onNavigate('coding_lab')}
+                className="px-4 py-2 rounded-lg bg-[var(--foreground)] hover:opacity-90 text-[var(--background)] font-medium text-xs sm:text-sm transition cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
+              >
+                <span>Launch Coding Lab</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Clean Technical Preview Panel */}
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)] p-4 font-mono text-xs text-[var(--foreground)]">
+              <div className="flex items-center justify-between pb-2.5 border-b border-[var(--border)] mb-3 text-[11px]">
+                <span className="font-semibold text-[var(--foreground)]">ESP32 Pinout & Firmware Simulator</span>
+                <span className="text-emerald-500 font-medium">STATUS: READY</span>
+              </div>
+              <div className="bg-[var(--surface)] p-3 rounded-lg border border-[var(--border)] space-y-1.5">
+                <div className="text-[var(--muted-text)] text-[10px]">// Pin configuration & setup</div>
+                <div><span className="text-emerald-500 font-semibold">void</span> <span className="text-[var(--foreground)] font-semibold">setup</span>() &#123;</div>
+                <div className="pl-4 text-[var(--muted-text)]">Serial.<span className="text-emerald-500">begin</span>(115200);</div>
+                <div className="pl-4 text-[var(--muted-text)]">pinMode(2, OUTPUT); <span className="opacity-50">// Built-in LED</span></div>
+                <div>&#125;</div>
+                <div><span className="text-emerald-500 font-semibold">void</span> <span className="text-[var(--foreground)] font-semibold">loop</span>() &#123;</div>
+                <div className="pl-4 text-[var(--muted-text)]">digitalWrite(2, HIGH);</div>
+                <div className="pl-4 text-[var(--muted-text)]">delay(1000);</div>
+                <div>&#125;</div>
+              </div>
+              <div className="mt-3 flex items-center justify-between text-[11px] text-[var(--muted-text)]">
+                <span>Board: ESP32-WROOM-32</span>
+                <span className="text-[var(--foreground)] font-semibold">I/O: GPIO 2 = HIGH</span>
+              </div>
+            </div>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
-            How Learning Works at InnoLink
+        </div>
+      </section>
+
+      {/* 4. FOUR-STEP LEARNING CYCLE */}
+      <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
+        <div className="text-center max-w-xl mx-auto mb-10">
+          <div className="text-xs font-semibold uppercase tracking-wider text-[var(--muted-text)] mb-1">
+            Structured Progression
+          </div>
+          <h2 className="text-xl sm:text-2xl font-bold text-[var(--foreground)] tracking-tight">
+            How Learning Works
           </h2>
-          <p className="text-sm text-slate-400 mt-2">
-            Structured 4-step progressive mastery cycle tailored for hardware and electronics disciples.
+          <p className="text-xs sm:text-sm text-[var(--muted-text)] mt-1">
+            Step-by-step curriculum designed for verifiable engineering competence.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="p-6 rounded-3xl border border-slate-800 bg-slate-900/40 relative">
-            <div className="w-10 h-10 rounded-2xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 flex items-center justify-center font-bold text-sm mb-4">
-              01
-            </div>
-            <h3 className="text-base font-bold text-white mb-2">Mentor Video Lessons</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Watch step-by-step oscilloscope traces, component soldering, and schematic derivations presented by veteran mentors.
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-xs">
+            <div className="text-xs font-mono font-semibold text-[var(--muted-text)] mb-2">STEP 01</div>
+            <h3 className="text-sm font-semibold text-[var(--foreground)] mb-1">Video Demonstrations</h3>
+            <p className="text-xs text-[var(--muted-text)] leading-relaxed">
+              Step-by-step laboratory explanations, circuit schematics, and live breadboard wiring.
             </p>
           </div>
 
-          <div className="p-6 rounded-3xl border border-slate-800 bg-slate-900/40 relative">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-bold text-sm mb-4">
-              02
-            </div>
-            <h3 className="text-base font-bold text-white mb-2">Gemini AI Study Notes</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Reviewed key concepts, formula cheat-sheets, and instant context-aware Q&A for every lesson you study.
+          <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-xs">
+            <div className="text-xs font-mono font-semibold text-[var(--muted-text)] mb-2">STEP 02</div>
+            <h3 className="text-sm font-semibold text-[var(--foreground)] mb-1">Virtual Lab Practice</h3>
+            <p className="text-xs text-[var(--muted-text)] leading-relaxed">
+              Build and debug firmware directly on simulated microcontrollers before physical assembly.
             </p>
           </div>
 
-          <div className="p-6 rounded-3xl border border-slate-800 bg-slate-900/40 relative">
-            <div className="w-10 h-10 rounded-2xl bg-blue-500/10 text-blue-400 border border-blue-500/30 flex items-center justify-center font-bold text-sm mb-4">
-              03
-            </div>
-            <h3 className="text-base font-bold text-white mb-2">Assessments & Labs</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Pass timed module assessments and submit real breadboard circuit photos or calculations for mentor grading.
+          <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-xs">
+            <div className="text-xs font-mono font-semibold text-[var(--muted-text)] mb-2">STEP 03</div>
+            <h3 className="text-sm font-semibold text-[var(--foreground)] mb-1">Assessments & Labs</h3>
+            <p className="text-xs text-[var(--muted-text)] leading-relaxed">
+              Pass timed module assessments and submit hands-on lab code for mentor review.
             </p>
           </div>
 
-          <div className="p-6 rounded-3xl border border-slate-800 bg-slate-900/40 relative">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center justify-center font-bold text-sm mb-4">
-              04
-            </div>
-            <h3 className="text-base font-bold text-white mb-2">Certified Mastery</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Achieve 100% path completion and earn an official verifiable InnoLink Technologies certificate.
+          <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-xs">
+            <div className="text-xs font-mono font-semibold text-[var(--muted-text)] mb-2">STEP 04</div>
+            <h3 className="text-sm font-semibold text-[var(--foreground)] mb-1">Verified Certificate</h3>
+            <p className="text-xs text-[var(--muted-text)] leading-relaxed">
+              Earn an official certificate upon completing all lessons and passing course tests.
             </p>
           </div>
         </div>
       </section>
 
-      {/* 4. AI-POWERED LEARNING SHOWCASE */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-slate-800/60">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
-          <div className="space-y-4">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-cyan-950/60 text-cyan-300 border border-cyan-500/30">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Powered by Google Gemini 3.8</span>
-            </div>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight">
-              Context-Aware AI Tutor Built into Every Lesson
-            </h2>
-            <p className="text-sm text-slate-300 leading-relaxed">
-              Stuck on why a BJT collector voltage saturates or how capacitor ripple factor behaves under load?
-              Our integrated AI tutor is grounded in your current lesson curriculum, providing precise, mentor-vetted answers without fluff.
-            </p>
-
-            <div className="space-y-2.5 pt-2">
-              <div className="flex items-start gap-2.5 text-xs text-slate-300">
-                <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                <span>Automatic AI lesson summaries reviewed and approved by faculty mentors before publishing.</span>
-              </div>
-              <div className="flex items-start gap-2.5 text-xs text-slate-300">
-                <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                <span>Contextual "Ask AI about this lesson" tab directly in the video player.</span>
-              </div>
-              <div className="flex items-start gap-2.5 text-xs text-slate-300">
-                <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                <span>AI-assisted draft quiz questions tested and refined by engineers.</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Interactive AI Preview Box */}
-          <div className="p-6 rounded-3xl border border-slate-800 bg-slate-900/90 shadow-2xl relative">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
-              <div className="flex items-center gap-2">
-                <div className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-xs font-semibold text-white">Ask Gemini About This Lesson</span>
-              </div>
-              <span className="text-[11px] text-cyan-400 font-mono">Lesson 05: Transistor Biasing</span>
-            </div>
-
-            <div className="space-y-3 font-mono text-xs">
-              <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 text-slate-300">
-                <span className="text-slate-400 font-sans text-[11px] block mb-1">Student asked:</span>
-                “Why does collector current change when base-emitter voltage exceeds 0.7V?”
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-cyan-950/30 border border-cyan-500/30 text-cyan-200">
-                <span className="text-cyan-400 font-sans text-[11px] font-bold block mb-1">
-                  Gemini Tutor Response:
-                </span>
-                <p className="leading-relaxed font-sans text-xs">
-                  At 0.7V forward bias in silicon, the base-emitter depletion barrier collapses. This injects abundant electrons from the heavily doped emitter into the thin base. Because the base is narrow and reverse-biased by V_CC, &gt;98% of these electrons are swept across into the collector, causing exponential collector current I_C = I_S * e^(V_BE / V_T).
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. STUDENT PROGRESS & LEARNING PATH PREVIEW */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-slate-800/60">
-        <div className="text-center max-w-2xl mx-auto mb-10">
-          <div className="text-xs font-bold uppercase tracking-wider text-cyan-400 mb-1">
-            Visual Roadmap
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
-            Animated Learning Path Tracking
+      {/* 5. CALL TO ACTION */}
+      <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto pb-16">
+        <div className="p-8 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-center shadow-xs">
+          <h2 className="text-xl sm:text-2xl font-bold text-[var(--foreground)] mb-2">
+            Ready to Begin Your Electronics Journey?
           </h2>
-          <p className="text-sm text-slate-400 mt-2">
-            No guessing where to go next. Interactive progress nodes unlock sequentially as you complete lessons and score passing grades on tests.
-          </p>
-        </div>
-
-        {/* Path Mockup Graphic */}
-        <div className="p-8 rounded-3xl border border-slate-800 bg-slate-900/60 max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 relative overflow-hidden">
-          <div className="flex flex-col items-center">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center font-bold">
-              ✓
-            </div>
-            <span className="text-xs font-semibold text-white mt-2">Module 1</span>
-            <span className="text-[10px] text-emerald-400">Completed (100%)</span>
-          </div>
-
-          <div className="w-16 h-1 bg-gradient-to-r from-emerald-500 to-cyan-400 rounded-full hidden sm:block" />
-
-          <div className="flex flex-col items-center">
-            <div className="w-12 h-12 rounded-2xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 flex items-center justify-center font-bold animate-pulse">
-              ▶
-            </div>
-            <span className="text-xs font-semibold text-white mt-2">Module 2</span>
-            <span className="text-[10px] text-cyan-400">Active (72%)</span>
-          </div>
-
-          <div className="w-16 h-1 bg-slate-800 rounded-full hidden sm:block" />
-
-          <div className="flex flex-col items-center opacity-60">
-            <div className="w-12 h-12 rounded-2xl bg-slate-800 text-slate-500 border border-slate-700 flex items-center justify-center font-bold">
-              <Lock className="w-4 h-4" />
-            </div>
-            <span className="text-xs font-semibold text-slate-300 mt-2">Module 3</span>
-            <span className="text-[10px] text-slate-400">Pass Test to Unlock</span>
-          </div>
-
-          <div className="w-16 h-1 bg-slate-800 rounded-full hidden sm:block" />
-
-          <div className="flex flex-col items-center opacity-60">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center justify-center font-bold">
-              🏆
-            </div>
-            <span className="text-xs font-semibold text-slate-300 mt-2">Final Certification</span>
-            <span className="text-[10px] text-slate-400">100% Required</span>
-          </div>
-        </div>
-      </section>
-
-      {/* 6. FAQ SECTION */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto border-t border-slate-800/60">
-        <div className="text-center mb-10">
-          <div className="text-xs font-bold uppercase tracking-wider text-cyan-400 mb-1">
-            Clarifications
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
-            Frequently Asked Questions
-          </h2>
-        </div>
-
-        <div className="space-y-4">
-          <div className="p-5 rounded-2xl border border-slate-800 bg-slate-900/40">
-            <h4 className="text-sm font-bold text-white mb-1">How do course access activation keys work?</h4>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Mentors can generate unique activation keys (e.g. <code className="text-cyan-400">INNO-ELEC-7K29-XP4A</code>) for students enrolled through institutions or offline workshops. You can redeem this key in your Student Dashboard or on the course purchase page to instantly unlock lessons.
-            </p>
-          </div>
-
-          <div className="p-5 rounded-2xl border border-slate-800 bg-slate-900/40">
-            <h4 className="text-sm font-bold text-white mb-1">Can I install InnoLink as an app on my phone?</h4>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Yes! InnoLink Technologies is fully compliant as a Progressive Web App (PWA). Click the "Install App" button in the header on Chrome/Android, or tap "Share &gt; Add to Home Screen" on iOS Safari to use it as a native mobile app.
-            </p>
-          </div>
-
-          <div className="p-5 rounded-2xl border border-slate-800 bg-slate-900/40">
-            <h4 className="text-sm font-bold text-white mb-1">How are assignments graded?</h4>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Students submit practical homework (circuit schematics, calculations, or lab photos). Mentors inspect submissions directly in their portal, award marks, and provide detailed written engineering feedback.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* 7. CONTACT / MENTOR INQUIRY SECTION */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto border-t border-slate-800/60">
-        <div className="rounded-3xl border border-cyan-500/30 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 p-8 sm:p-12 text-center relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-3">
-            Ready to Build Your Engineering Career?
-          </h2>
-          <p className="text-sm text-slate-300 max-w-xl mx-auto mb-6">
-            Join InnoLink Technologies today. Get personalized mentorship, AI study companions, and hands-on electronics mastery.
+          <p className="text-xs sm:text-sm text-[var(--muted-text)] max-w-lg mx-auto mb-6">
+            Sign up for courses, test your skills in the virtual hardware lab, and earn verified certifications.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <button
               onClick={() => openAuthModal('register')}
-              className="px-6 py-3 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-sm transition shadow-lg shadow-cyan-600/25 cursor-pointer"
+              className="px-5 py-2.5 rounded-lg bg-[var(--foreground)] hover:opacity-90 text-[var(--background)] font-medium text-xs sm:text-sm transition cursor-pointer shadow-xs"
             >
-              Register as Student
+              Create Student Account
             </button>
             <button
-              onClick={() => openAuthModal('mentor_login')}
-              className="px-6 py-3 rounded-2xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-semibold text-sm transition cursor-pointer"
+              onClick={() => onNavigate('courses')}
+              className="px-5 py-2.5 rounded-lg bg-[var(--surface)] border border-[var(--border)] hover:bg-[var(--surface-secondary)] text-[var(--foreground)] font-medium text-xs sm:text-sm transition cursor-pointer shadow-xs"
             >
-              Mentor Portal Access
+              Browse Catalog
             </button>
           </div>
         </div>

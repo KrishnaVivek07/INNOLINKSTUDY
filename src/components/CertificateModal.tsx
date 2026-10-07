@@ -45,7 +45,7 @@ export const CertificateModal: React.FC<CertificateModalProps> = ({
         </div>
 
         {/* Certificate Card Printable Container */}
-        <div className="relative rounded-3xl border-4 border-amber-500/50 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-8 sm:p-12 text-slate-100 shadow-2xl overflow-hidden print:border-black print:text-black print:bg-white">
+        <div className="relative rounded-3xl border-4 border-amber-500/50 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-8 sm:p-12 text-slate-100 shadow-2xl overflow-hidden print:border-black print:text-black print:bg-[var(--surface)]">
           {/* Ornamental Circuit Watermark Border */}
           <div className="absolute inset-2 border border-cyan-500/20 rounded-2xl pointer-events-none" />
           <div className="absolute -top-16 -right-16 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -61,7 +61,7 @@ export const CertificateModal: React.FC<CertificateModalProps> = ({
                 InnoLink Technologies
               </span>
             </div>
-            <div className="text-[11px] uppercase tracking-widest text-slate-400">
+            <div className="text-[11px] uppercase tracking-widest text-[var(--muted-text)]">
               Department of Electronics & Hardware Engineering
             </div>
 
@@ -92,10 +92,10 @@ export const CertificateModal: React.FC<CertificateModalProps> = ({
           </div>
 
           {/* Footer of Certificate */}
-          <div className="pt-8 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-6 text-xs text-slate-400 relative z-10">
+          <div className="pt-8 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-6 text-xs text-[var(--muted-text)] relative z-10">
             <div className="text-center sm:text-left">
               <div className="font-serif italic text-white text-base">Prof. K. Prabhala</div>
-              <div className="text-[11px] text-slate-400 border-t border-slate-700 pt-1 mt-1">
+              <div className="text-[11px] text-[var(--muted-text)] border-t border-slate-700 pt-1 mt-1">
                 Lead Mentor & Curriculum Chair
               </div>
             </div>
@@ -108,8 +108,8 @@ export const CertificateModal: React.FC<CertificateModalProps> = ({
 
             <div className="text-center sm:text-right space-y-1">
               <div className="font-mono text-[11px] text-cyan-400">ID: {certificateId}</div>
-              <div className="text-[11px] text-slate-400">Date: {new Date(completedDate).toLocaleDateString()}</div>
-              <div className="text-[10px] text-slate-400 font-medium">Powered by MK Solutions</div>
+              <div className="text-[11px] text-[var(--muted-text)]">Date: {new Date(completedDate).toLocaleDateString()}</div>
+              <div className="text-[10px] text-[var(--muted-text)] font-medium">Powered by MK Solutions</div>
             </div>
           </div>
         </div>

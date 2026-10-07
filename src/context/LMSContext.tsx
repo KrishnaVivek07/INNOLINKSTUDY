@@ -11,6 +11,7 @@ import {
   Assignment,
   Submission,
   CourseProgress,
+  PaymentRecord,
 } from '../types';
 import {
   SEED_COURSES,
@@ -31,6 +32,7 @@ interface LMSContextType {
   aiSummaries: AISummary[];
   enrollments: Enrollment[];
   courseAccessKeys: CourseAccessKey[];
+  payments: PaymentRecord[];
   tests: Test[];
   testAttempts: TestAttempt[];
   assignments: Assignment[];
@@ -38,8 +40,24 @@ interface LMSContextType {
   progressRecords: CourseProgress[];
   
   // Student Actions
-  purchaseCourse: (courseId: string, paymentMethod: string) => Promise<{ success: boolean; transactionId: string }>;
-  redeemAccessKey: (keyString: string) => Promise<{ success: boolean; courseTitle: string }>;
+  purchaseCourse: (
+    courseId: string,
+    paymentMethod?: string,
+    gatewayTransactionId?: string
+  ) => Promise<{
+    success: boolean;
+    orderId: string;
+    paymentId: string;
+    courseKey: string;
+    emailStatus: 'SENT' | 'PENDING' | 'FAILED';
+    courseTitle: string;
+    amount: number;
+    currency: string;
+    message: string;
+  }>;
+  redeemAccessKey: (keyString: string) => Promise<{ success: boolean; courseTitle: string; courseId?: string }>;
+  resendCourseKey: (orderId: string) => Promise<{ success: boolean; message: string; emailStatus: 'SENT' | 'FAILED' | 'PENDING' }>;
+  getStudentPayments: () => Promise<PaymentRecord[]>;
   isEnrolled: (courseId: string) => boolean;
   getCourseProgress: (courseId: string) => CourseProgress;
   markLessonComplete: (courseId: string, lessonId: string) => void;
@@ -245,6 +263,18 @@ export const LMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return [];
   });
 
+  const [payments, setPayments] = useState<PaymentRecord[]>(() => {
+    const saved = localStorage.getItem('innolink_payments');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
+
   const [tests, setTests] = useState<Test[]>(() => {
     const saved = localStorage.getItem('innolink_tests');
     if (saved) {
@@ -334,6 +364,9 @@ export const LMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('innolink_keys', JSON.stringify(courseAccessKeys));
   }, [courseAccessKeys]);
   useEffect(() => {
+    localStorage.setItem('innolink_payments', JSON.stringify(payments));
+  }, [payments]);
+  useEffect(() => {
     localStorage.setItem('innolink_tests', JSON.stringify(tests));
   }, [tests]);
   useEffect(() => {
@@ -366,8 +399,8 @@ export const LMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Student Enrollment Check
   const isEnrolled = (courseId: string) => {
     if (!currentUser) return false;
-    // Mentor has full access
-    if (currentUser.role === 'mentor') return true;
+    // Admin has full access
+    if (currentUser.role === 'admin') return true;
 
     // Check direct enrollment
     const directlyEnrolled = enrollments.some(
@@ -420,37 +453,52 @@ export const LMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Course Purchase with Backend Verification
-  const purchaseCourse = async (courseId: string, paymentMethod: string) => {
+  const purchaseCourse = async (courseId: string, paymentMethod?: string, gatewayTransactionId?: string) => {
     const course = courses.find((c) => c.id === courseId);
     if (!course) throw new Error('Course not found');
-    const studentUid = currentUser?.uid || 'student-demo';
-    const studentEmail = currentUser?.email || 'student@innolink.tech';
+    if (!currentUser || !currentUser.email) {
+      throw new Error('Please sign in to your student account with a verified email before completing checkout.');
+    }
 
-    // 1. Create order on backend
+    const studentUid = currentUser.uid;
+    const studentEmail = currentUser.email;
+    const studentName = currentUser.displayName || 'Student';
+
+    // 1. Create order on backend (frontend does NOT specify amount; backend determines from Firestore)
     const orderRes = await fetch('/api/payment/create-order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         courseId,
-        amount: course.price,
         studentId: studentUid,
+        studentEmail,
+        studentName,
       }),
     });
-    if (!orderRes.ok) throw new Error('Failed to create payment order');
+    if (!orderRes.ok) {
+      const errData = await orderRes.json().catch(() => ({}));
+      throw new Error(errData.error || 'Failed to create payment order on server.');
+    }
     const orderData = await orderRes.json();
 
-    // 2. Simulate payment gateway verification on backend
+    // 2. Perform payment transaction through gateway
+    const paymentId = gatewayTransactionId || `PAY_${Date.now()}_${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+    // 3. Verify payment server-side (do NOT trust frontend alone)
     const verifyRes = await fetch('/api/payment/verify-payment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         orderId: orderData.orderId,
         courseId,
-        amount: course.price,
+        amount: orderData.amount,
         studentId: studentUid,
+        studentEmail,
+        studentName,
         timestamp: orderData.timestamp,
         signature: orderData.signature,
-        transactionId: `INNO_TXN_${Date.now()}`,
+        paymentId,
+        paymentStatus: 'success',
       }),
     });
 
@@ -459,18 +507,58 @@ export const LMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       throw new Error(verifyData.error || 'Payment verification failed on the server.');
     }
 
-    // 3. Create Enrollment
+    // 4. Record verified payment in state
+    const newPaymentRecord: PaymentRecord = {
+      id: verifyData.orderId,
+      orderId: verifyData.orderId,
+      paymentId: verifyData.paymentId,
+      studentId: studentUid,
+      studentEmail,
+      studentName,
+      courseId,
+      courseTitle: verifyData.courseTitle || course.title,
+      amount: verifyData.amount || orderData.amount,
+      currency: verifyData.currency || 'USD',
+      status: 'VERIFIED',
+      verifiedAt: verifyData.verifiedAt || new Date().toISOString(),
+      emailStatus: verifyData.emailStatus || 'PENDING',
+      courseKey: verifyData.courseKey,
+      createdAt: new Date().toISOString(),
+    };
+
+    setPayments((prev) => [newPaymentRecord, ...prev.filter((p) => p.orderId !== newPaymentRecord.orderId)]);
+
+    // 5. Create or update Enrollment
     const newEnrollment: Enrollment = {
-      id: `enroll-${Date.now()}`,
+      id: `enroll-${verifyData.orderId}`,
       studentId: studentUid,
       studentEmail,
       courseId,
       enrolledAt: new Date().toISOString(),
-      paymentId: verifyData.transactionId,
+      paymentId: verifyData.paymentId,
+      accessKeyUsed: verifyData.courseKey,
       status: 'active',
     };
 
-    setEnrollments((prev) => [newEnrollment, ...prev]);
+    setEnrollments((prev) => [newEnrollment, ...prev.filter((e) => !(e.courseId === courseId && (e.studentId === studentUid || e.studentEmail?.toLowerCase() === studentEmail.toLowerCase())))]);
+
+    // 6. If a course key was issued, store in courseAccessKeys
+    if (verifyData.courseKey) {
+      const newKey: CourseAccessKey = {
+        id: `key-${Date.now()}`,
+        key: verifyData.courseKey,
+        courseId,
+        studentId: studentUid,
+        studentEmail,
+        mentorId: course.mentorId,
+        isUsed: false,
+        status: 'ACTIVE',
+        orderId: verifyData.orderId,
+        paymentId: verifyData.paymentId,
+        createdAt: new Date().toISOString(),
+      };
+      setCourseAccessKeys((prev) => [newKey, ...prev.filter((k) => k.key.toUpperCase() !== newKey.key.toUpperCase())]);
+    }
 
     // Initialize progress record
     setProgressRecords((prev) => {
@@ -496,13 +584,25 @@ export const LMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     return {
       success: true,
-      transactionId: verifyData.transactionId,
+      orderId: verifyData.orderId,
+      paymentId: verifyData.paymentId,
+      courseKey: verifyData.courseKey,
+      emailStatus: verifyData.emailStatus,
+      courseTitle: verifyData.courseTitle || course.title,
+      amount: verifyData.amount || orderData.amount,
+      currency: verifyData.currency || 'USD',
+      message: verifyData.message,
     };
   };
 
   // Redeem Course Access Key
   const redeemAccessKey = async (keyString: string) => {
     const formatted = keyString.trim().toUpperCase();
+    if (!formatted) throw new Error('Please enter a course activation key.');
+
+    const studentUid = currentUser?.uid || 'student-demo';
+    const studentEmail = currentUser?.email || 'student@innolink.tech';
+
     let keyRecord = courseAccessKeys.find((k) => k.key.toUpperCase() === formatted);
     let targetCourseId = keyRecord?.courseId;
 
@@ -524,18 +624,38 @@ export const LMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    const course = (targetCourseId ? courses.find((c) => c.id === targetCourseId) : null) || courses[0];
-    if (!course) throw new Error('Associated course not found.');
-
-    const studentUid = currentUser?.uid || 'student-demo';
-    const studentEmail = currentUser?.email || 'student@innolink.tech';
-
-    // Mark key used
-    if (keyRecord) {
-      setCourseAccessKeys((prev) =>
-        prev.map((k) => (k.id === keyRecord!.id ? { ...k, isUsed: true, usedBy: studentUid } : k))
-      );
+    // Check payments records
+    if (!targetCourseId) {
+      const paymentMatch = payments.find((p) => p.courseKey && p.courseKey.toUpperCase() === formatted);
+      if (paymentMatch) {
+        targetCourseId = paymentMatch.courseId;
+      }
     }
+
+    const course = (targetCourseId ? courses.find((c) => c.id === targetCourseId) : null) || courses[0];
+    if (!course) throw new Error('Associated course not found for this key.');
+
+    if (keyRecord && keyRecord.status === 'REVOKED') {
+      throw new Error('This course activation key has been revoked. Please contact support.');
+    }
+    if (keyRecord && keyRecord.status === 'EXPIRED') {
+      throw new Error('This course activation key has expired.');
+    }
+
+    // Mark key redeemed
+    setCourseAccessKeys((prev) =>
+      prev.map((k) =>
+        k.key.toUpperCase() === formatted
+          ? {
+              ...k,
+              isUsed: true,
+              status: 'REDEEMED',
+              usedBy: studentUid,
+              redeemedAt: new Date().toISOString(),
+            }
+          : k
+      )
+    );
 
     // Create Enrollment
     const newEnrollment: Enrollment = {
@@ -563,7 +683,64 @@ export const LMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return {
       success: true,
       courseTitle: course.title,
+      courseId: course.id,
     };
+  };
+
+  // Resend Course Key to student's verified email with rate limiting
+  const resendCourseKey = async (orderId: string) => {
+    if (!currentUser) throw new Error('Please sign in to resend your course key.');
+    const res = await fetch('/api/payment/resend-course-key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orderId,
+        studentId: currentUser.uid,
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to resend course key.');
+    }
+
+    // Update in state
+    setPayments((prev) =>
+      prev.map((p) =>
+        p.orderId === orderId
+          ? { ...p, emailStatus: data.emailStatus || 'SENT', lastResentAt: new Date().toISOString() }
+          : p
+      )
+    );
+
+    return {
+      success: true,
+      message: data.message,
+      emailStatus: data.emailStatus,
+    };
+  };
+
+  // Get student verified payments from backend
+  const getStudentPayments = async (): Promise<PaymentRecord[]> => {
+    if (!currentUser) return payments;
+    try {
+      const res = await fetch(`/api/payment/student-payments/${currentUser.uid}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.payments) && data.payments.length > 0) {
+          setPayments((prev) => {
+            const map = new Map<string, PaymentRecord>();
+            prev.forEach((p) => map.set(p.orderId, p));
+            data.payments.forEach((p: PaymentRecord) => map.set(p.orderId, { ...map.get(p.orderId), ...p }));
+            return Array.from(map.values());
+          });
+          return data.payments;
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+    return payments.filter((p) => p.studentId === currentUser.uid);
   };
 
   // Helper to ensure a course exists with lessons for an authorized student
@@ -871,6 +1048,7 @@ export const LMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       courseId,
       mentorId: currentUser?.uid || 'mentor-karthik',
       isUsed: false,
+      status: 'ACTIVE',
       createdAt: new Date().toISOString(),
       expiresAt: '2026-12-31T23:59:59.000Z',
     };
@@ -886,6 +1064,7 @@ export const LMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem('innolink_ai_summaries');
     localStorage.removeItem('innolink_enrollments');
     localStorage.removeItem('innolink_keys');
+    localStorage.removeItem('innolink_payments');
     localStorage.removeItem('innolink_tests');
     localStorage.removeItem('innolink_assignments');
     localStorage.removeItem('innolink_submissions');
@@ -896,6 +1075,7 @@ export const LMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAiSummaries([]);
     setEnrollments([]);
     setCourseAccessKeys([]);
+    setPayments([]);
     setTests([]);
     setTestAttempts([]);
     setAssignments([]);
@@ -912,6 +1092,7 @@ export const LMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         aiSummaries,
         enrollments,
         courseAccessKeys,
+        payments,
         tests,
         testAttempts,
         assignments,
@@ -919,6 +1100,8 @@ export const LMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         progressRecords,
         purchaseCourse,
         redeemAccessKey,
+        resendCourseKey,
+        getStudentPayments,
         isEnrolled,
         getCourseProgress,
         markLessonComplete,

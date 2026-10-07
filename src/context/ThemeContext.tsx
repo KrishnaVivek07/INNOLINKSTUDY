@@ -11,49 +11,68 @@ const ThemeContext = createContext<ThemeContextType | null>(null);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setThemeState] = useState<AppTheme>(() => {
-    const saved = localStorage.getItem('innolink_theme') as AppTheme;
-    if (saved && ['dark', 'light', 'system'].includes(saved)) {
-      return saved;
+    try {
+      const saved = localStorage.getItem('innolink_theme') as AppTheme;
+      if (saved && ['dark', 'light', 'system'].includes(saved)) {
+        return saved;
+      }
+    } catch {
+      // fallback
     }
     return 'system';
   });
 
-  const [resolvedTheme, setResolvedTheme] = useState<'dark' | 'light'>('dark');
+  const getSystemTheme = (): 'dark' | 'light' => {
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    return 'light';
+  };
+
+  const [resolvedTheme, setResolvedTheme] = useState<'dark' | 'light'>(() => {
+    if (theme === 'system') return getSystemTheme();
+    return theme;
+  });
 
   const setTheme = (newTheme: AppTheme) => {
     setThemeState(newTheme);
-    localStorage.setItem('innolink_theme', newTheme);
+    try {
+      localStorage.setItem('innolink_theme', newTheme);
+    } catch {
+      // fallback
+    }
   };
 
   useEffect(() => {
-    const updateTheme = () => {
-      let isDark = true;
+    const applyTheme = () => {
+      let active: 'dark' | 'light';
       if (theme === 'system') {
-        isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        active = getSystemTheme();
       } else {
-        isDark = theme === 'dark';
+        active = theme;
       }
 
-      const active = isDark ? 'dark' : 'light';
       setResolvedTheme(active);
 
       const root = document.documentElement;
       root.classList.remove('dark', 'light');
       root.classList.add(active);
       root.setAttribute('data-theme', active);
+      root.style.colorScheme = active;
     };
 
-    updateTheme();
+    applyTheme();
 
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = () => {
-      if (theme === 'system') {
-        updateTheme();
-      }
-    };
-
-    mediaQuery.addEventListener('change', handler);
-    return () => mediaQuery.removeEventListener('change', handler);
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const listener = () => {
+        if (theme === 'system') {
+          applyTheme();
+        }
+      };
+      mediaQuery.addEventListener('change', listener);
+      return () => mediaQuery.removeEventListener('change', listener);
+    }
   }, [theme]);
 
   return (

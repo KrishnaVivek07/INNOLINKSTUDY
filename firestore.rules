@@ -15,94 +15,167 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Users collection: users can read and write their own profile
+    // Secure Admin check: authorized admin emails or admin role in users collection
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == "karthikeyaprabhala2005@gmail.com" ||
+        request.auth.token.email == "admin@innolink.tech" ||
+        request.auth.token.email == "kkscreative@innolink.tech" ||
+        request.auth.token.email.matches("(?i)kkscreative.*") ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin")
+      );
+    }
+
+    // Users collection: users can read and write their own profile; admin can manage all
     match /users/{userId} {
       allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create, update: if isOwner(userId);
-      allow delete: if false;
+      allow list: if isAdmin();
+      allow create, update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
     }
 
-    // Courses: published courses readable by all or signed-in users; mentors can manage their own courses
+    // Courses: published courses readable by all; admin manages all courses
     match /courses/{courseId} {
       allow read: if true;
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && (resource.data.mentorId == request.auth.uid || request.auth.token.email == "karthikeyaprabhala2005@gmail.com");
+      allow create, update, delete: if isAdmin();
     }
 
-    // Modules
+    // Modules: readable by all; admin manages all
     match /modules/{moduleId} {
       allow read: if true;
-      allow create, update, delete: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
 
-    // Lessons
+    // Lessons: readable by all; admin manages all
     match /lessons/{lessonId} {
       allow read: if true;
-      allow create, update, delete: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
 
-    // AI Summaries
+    // AI Summaries: students can read; admin can create, update, delete
     match /aiSummaries/{summaryId} {
       allow read: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
 
-    // Enrollments
+    // Enrollments: students read their own; admin manages all
     match /enrollments/{enrollmentId} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && (resource.data.studentId == request.auth.uid || resource.data.studentEmail == request.auth.token.email || isAdmin());
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && (resource.data.studentId == request.auth.uid);
-      allow delete: if false;
+      allow update: if isAdmin() || (isSignedIn() && resource.data.studentId == request.auth.uid);
+      allow delete: if isAdmin();
     }
 
-    // Course Access Keys
+    // Payments: students read their own; admin reads all
+    match /payments/{paymentId} {
+      allow read: if isSignedIn() && (resource.data.studentId == request.auth.uid || resource.data.studentEmail == request.auth.token.email || isAdmin());
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Course Access Keys: students can read to redeem; admin manages
     match /courseAccessKeys/{keyId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
 
-    // Tests
+    // Tests: signed-in users can read published; admin manages
     match /tests/{testId} {
       allow read: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
 
-    // Test Attempts
+    // Test Attempts: students can create and view their own; admin views all
     match /testAttempts/{attemptId} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && (resource.data.studentId == request.auth.uid || isAdmin());
       allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if false;
+      allow update, delete: if isAdmin();
     }
 
-    // Assignments
+    // Assignments: signed in users can read; admin manages
     match /assignments/{assignmentId} {
       allow read: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
 
-    // Submissions
+    // Submissions: students submit their own; admin reviews and grades
     match /submissions/{submissionId} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && (resource.data.studentId == request.auth.uid || isAdmin());
       allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if false;
+      allow update: if isAdmin() || (isSignedIn() && resource.data.studentId == request.auth.uid && resource.data.status != "reviewed");
+      allow delete: if isAdmin();
     }
 
-    // Progress
+    // Progress: students manage their own; admin can read
     match /progress/{progressId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn();
-      allow delete: if false;
+      allow read: if isSignedIn() && (resource.data.studentId == request.auth.uid || isAdmin());
+      allow create, update: if isSignedIn() && (request.resource.data.studentId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
     }
 
     // Google Meet Live Sessions
     match /meetSessions/{sessionId} {
       allow read: if true;
-      allow create, update, delete: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Coding & Hardware Labs: readable if signed in; managed by admin
+    match /codingLabs/{labId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Student Coding Projects: private to the owner and admin
+    match /codingProjects/{projectId} {
+      allow read, write: if isSignedIn() && (resource == null || resource.data.studentId == request.auth.uid || isAdmin());
+    }
+
+    // Lab Submissions: students submit their own; admin reviews
+    match /labSubmissions/{submissionId} {
+      allow read: if isSignedIn() && (resource.data.studentId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    // STEM Marketplace Products: readable by everyone; admin manages catalog & inventory
+    match /marketplaceProducts/{productId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // STEM Marketplace Orders: buyers can read their own orders; admin manages all
+    match /marketplaceOrders/{orderId} {
+      allow read: if isSignedIn() && (resource.data.buyerId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    // STEM Marketplace Reviews: readable by all, created by verified purchasers
+    match /marketplaceReviews/{reviewId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.buyerId == request.auth.uid);
+    }
+
+    // Coupons: signed-in users can read coupons assigned to them; admin manages all
+    match /coupons/{couponId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Platform Settings: Terms & Conditions readable by all; writable only by authorized admin
+    match /platformSettings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Terms Acceptances: students can read and create their own record; admin can view all
+    match /termsAcceptances/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update: if isOwner(userId) && request.resource.data.userId == userId;
+      allow delete: if isAdmin();
     }
 
     // Connection test document

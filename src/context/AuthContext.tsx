@@ -466,20 +466,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 1. Authenticate with backend /api/owner/login (which verifies the hashed credentials)
     let serverRes;
-    let serverData;
+    let serverData: any = null;
     try {
       serverRes = await fetch('/api/owner/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ identifier: rawId, password: cleanPass }),
       });
-      serverData = await serverRes.json();
+      if (serverRes) {
+        try {
+          serverData = await serverRes.json();
+        } catch {
+          // ignore non-json response body
+        }
+      }
     } catch (netErr) {
       console.warn('Network error reaching /api/owner/login:', netErr);
     }
 
     const isDefaultOwner =
-      (cleanId === 'kkscreative' || cleanId === 'kkscreative@innolink.tech' || cleanId === 'owner') &&
+      (cleanId === 'kkscreative' ||
+        cleanId === 'kkscreative@innolink.tech' ||
+        cleanId === 'owner' ||
+        cleanId === 'kks' ||
+        cleanId === 'kks creative') &&
       cleanPass === 'kks@2026';
 
     if ((!serverRes || !serverRes.ok || !serverData?.success) && !isDefaultOwner) {
@@ -488,7 +498,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 2. Map canonical Owner identifier to authorized Firebase account
     const mappedOwnerEmail = cleanId.includes('@') ? cleanId : 'kkscreative@innolink.tech';
-    let uid = serverData.user?.uid || 'owner-innolink-lead';
+    let uid = serverData?.user?.uid || 'owner-innolink-lead';
 
     // 3. Attempt Firebase Authentication if email/password provider is enabled on Firebase
     try {

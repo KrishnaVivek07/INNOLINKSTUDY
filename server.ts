@@ -1,10 +1,12 @@
-import express, { Request, Response } from 'express';
+import express, { type Request, type Response } from 'express';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 
 dotenv.config();
 
@@ -328,7 +330,15 @@ app.post('/api/owner/login', (req: Request, res: Response) => {
     const cleanId = String(identifier).trim().toLowerCase();
     const targetCanonical = (ownerCredentials.canonicalUsername || 'KKSCREATIVE').toLowerCase().trim();
 
-    if (cleanId !== targetCanonical && cleanId !== 'kkscreative' && cleanId !== 'kkscreative@innolink.tech' && cleanId !== OWNER_NOTIFICATION_EMAIL.toLowerCase()) {
+    const isRecognizedId =
+      cleanId === targetCanonical ||
+      cleanId === 'kkscreative' ||
+      cleanId === 'kkscreative@innolink.tech' ||
+      cleanId === 'owner' ||
+      cleanId === 'kks' ||
+      cleanId === OWNER_NOTIFICATION_EMAIL.toLowerCase();
+
+    if (!isRecognizedId) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -918,10 +928,6 @@ app.post('/api/coupons/validate', (req: Request, res: Response) => {
 // ----------------------------------------------------
 // 2. Payment Gateway Architecture, Security & Verification
 // ----------------------------------------------------
-// Import Firebase Client SDK for server-side persistence
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
-
 let firestoreDb: any = null;
 try {
   const cfgRaw = fs.readFileSync(path.resolve(process.cwd(), 'firebase-applet-config.json'), 'utf-8');

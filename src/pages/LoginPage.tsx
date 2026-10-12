@@ -328,6 +328,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               </div>
             )}
 
+            {selectedPortal === 'admin' && adminMode === 'login' && (
+              <div className="p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-700 dark:text-indigo-300 flex items-center justify-between gap-2">
+                <div>
+                  <span className="font-semibold">Default Owner Login:</span>{' '}
+                  <span className="font-mono font-bold">KKSCREATIVE</span> / <span className="font-mono">kks@2026</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail('KKSCREATIVE');
+                    setPassword('kks@2026');
+                  }}
+                  className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[11px] font-medium transition cursor-pointer shadow-xs"
+                >
+                  Quick Fill
+                </button>
+              </div>
+            )}
+
             {selectedPortal === 'admin' && adminMode === 'reset_credentials' ? (
               <>
                 <div className="p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-xs text-cyan-700 dark:text-cyan-300">

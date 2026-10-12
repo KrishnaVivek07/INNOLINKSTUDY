@@ -75,9 +75,10 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Course Access Keys: students can read to redeem; admin manages
+    // Course Access Keys: students can lookup a key directly to redeem; only admin can list or manage keys
     match /courseAccessKeys/{keyId} {
-      allow read: if isSignedIn();
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
       allow create, update, delete: if isAdmin();
     }
 
@@ -178,9 +179,9 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Connection test document
+    // Connection test document: restricted to admin
     match /test/{docId} {
-      allow read, write: if true;
+      allow read, write: if isAdmin();
     }
   }
 }

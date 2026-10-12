@@ -137,7 +137,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           </div>
 
           <div className="text-center sm:text-right text-[var(--footer-text)]">
-            {branding.footerCopyright || `Copyright © ${branding.platformName}. All Rights Reserved.`}
+            {branding.footerCopyright || `Copyright © ${new Date().getFullYear()} ${branding.platformName}. All Rights Reserved.`}
           </div>
         </div>
       </div>

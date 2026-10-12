@@ -1,12 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  Play,
-  Square,
-  RotateCcw,
-  CheckCircle,
-  Copy,
-  Download,
-  Save,
   FolderOpen,
   Code,
   FileCode,
@@ -16,8 +9,16 @@ import {
   Cpu,
   Plus,
   Terminal,
+  FolderTree,
+  FileText,
+  Copy,
+  Download,
+  ChevronRight,
+  Layers,
+  Info,
 } from 'lucide-react';
 import { HardwareBoard, CodingLabLanguage } from '../../types';
+import { BOARD_REGISTRY } from '../../lib/boardRegistry';
 
 interface CodeEditorProps {
   board: HardwareBoard;
@@ -462,6 +463,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   terminalLogs = [],
 }) => {
   const [copied, setCopied] = useState(false);
+  const [showFileExplorer, setShowFileExplorer] = useState(false);
+  const [activeFile, setActiveFile] = useState<'sketch' | 'pins' | 'circuit' | 'readme'>('sketch');
   const [compileStatus, setCompileStatus] = useState<'idle' | 'checking' | 'passed' | 'error'>('idle');
   const [compileMessage, setCompileMessage] = useState<string>('');
   const [showExamples, setShowExamples] = useState(false);
@@ -474,7 +477,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   ]);
   const [terminalInput, setTerminalInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const terminalEndRef = useRef<HTMLDivElement | null>(null);
+  const terminalContainerRef = useRef<HTMLDivElement | null>(null);
+  const terminalAutoScrollRef = useRef<boolean>(true);
 
   // Sync external simulation logs into terminal history when on Raspberry Pi
   useEffect(() => {
@@ -489,8 +493,16 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     }
   }, [board, terminalLogs]);
 
+  const handleTerminalScroll = () => {
+    if (!terminalContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = terminalContainerRef.current;
+    terminalAutoScrollRef.current = scrollHeight - scrollTop - clientHeight < 35;
+  };
+
   useEffect(() => {
-    terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (terminalAutoScrollRef.current && terminalContainerRef.current) {
+      terminalContainerRef.current.scrollTop = terminalContainerRef.current.scrollHeight;
+    }
   }, [terminalHistory]);
 
   // Line numbers calculation
@@ -716,26 +728,83 @@ void loop() {
     setTerminalHistory((prev) => [...prev, ...newLogs]);
   };
 
+  const isPython =
+    (board === 'raspberry_pi' && (language === 'python' || !code.includes('#include'))) ||
+    (board === 'rp2040_pico' && (language === 'micropython' || !code.includes('#include')));
+  const mainSketchName = isPython ? 'main.py' : 'sketch.ino';
+  const boardDef = BOARD_REGISTRY[board] || BOARD_REGISTRY.arduino_uno;
+
   return (
     <div className={`flex flex-col bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-xl ${className}`}>
-      {/* 1. Header Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-slate-900/90 border-b border-slate-800 text-xs text-slate-300">
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Board Badge */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 font-mono text-[11px] text-cyan-400">
-            <Cpu className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="uppercase font-semibold">
-              {board === 'rp2040_pico'
-                ? 'Raspberry Pi Pico (RP2040 MCU)'
-                : board === 'raspberry_pi'
-                ? 'Raspberry Pi 4 / 5 (Linux SBC)'
-                : board.replace('_', ' ')}
-            </span>
-          </div>
+      {/* 1. Secondary Compact Editor Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-slate-900 border-b border-slate-800 text-xs text-slate-300 select-none">
+        {/* Left: File Explorer Toggle & Active File Tabs */}
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
+          {/* File Explorer Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setShowFileExplorer(!showFileExplorer)}
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition cursor-pointer border ${
+              showFileExplorer
+                ? 'border-cyan-500 bg-cyan-950/60 text-cyan-300'
+                : 'border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+            title="Toggle File Explorer Panel"
+          >
+            <FolderTree className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden sm:inline">Files</span>
+          </button>
 
-          {/* Languages Supported per Platform */}
+          {/* Active File Tab: Main Sketch */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveFile('sketch');
+              setActiveView('editor');
+            }}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-mono transition cursor-pointer border ${
+              activeFile === 'sketch' && activeView === 'editor'
+                ? 'border-cyan-500/50 bg-slate-950 text-cyan-300 font-semibold shadow-xs'
+                : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <FileCode className="w-3.5 h-3.5 text-cyan-400" />
+            <span>{mainSketchName}</span>
+          </button>
+
+          {/* Tab: pins.h */}
+          <button
+            type="button"
+            onClick={() => setActiveFile('pins')}
+            className={`hidden md:flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-mono transition cursor-pointer border ${
+              activeFile === 'pins'
+                ? 'border-cyan-500/50 bg-slate-950 text-cyan-300 font-semibold shadow-xs'
+                : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+            title="Hardware Pin Map Header"
+          >
+            <Cpu className="w-3.5 h-3.5 text-amber-400" />
+            <span>pins.h</span>
+          </button>
+
+          {/* Tab: README.md */}
+          <button
+            type="button"
+            onClick={() => setActiveFile('readme')}
+            className={`hidden md:flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-mono transition cursor-pointer border ${
+              activeFile === 'readme'
+                ? 'border-cyan-500/50 bg-slate-950 text-cyan-300 font-semibold shadow-xs'
+                : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+            title="Lab Wiring Instructions & Circuit Notes"
+          >
+            <FileText className="w-3.5 h-3.5 text-emerald-400" />
+            <span>README.md</span>
+          </button>
+
+          {/* Platform Language Mode Switchers */}
           {board === 'rp2040_pico' && (
-            <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[10px]">
+            <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[10px] ml-1">
               <button
                 type="button"
                 onClick={() => {
@@ -772,7 +841,7 @@ void loop() {
           )}
 
           {board === 'raspberry_pi' && (
-            <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[10px]">
+            <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[10px] ml-1">
               <button
                 type="button"
                 onClick={() => {
@@ -787,7 +856,7 @@ void loop() {
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                Python (RPi.GPIO)
+                Python
               </button>
               <button
                 type="button"
@@ -810,12 +879,15 @@ void loop() {
 
           {/* Linux SBC Terminal Toggle Button for Raspberry Pi */}
           {board === 'raspberry_pi' && (
-            <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[10px]">
+            <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[10px] ml-1">
               <button
                 type="button"
-                onClick={() => setActiveView('editor')}
+                onClick={() => {
+                  setActiveView('editor');
+                  setActiveFile('sketch');
+                }}
                 className={`px-2 py-0.5 rounded transition cursor-pointer flex items-center gap-1 ${
-                  activeView === 'editor'
+                  activeView === 'editor' && activeFile === 'sketch'
                     ? 'bg-slate-800 text-cyan-400 font-semibold'
                     : 'text-slate-400 hover:text-white'
                 }`}
@@ -833,44 +905,47 @@ void loop() {
                 }`}
               >
                 <Terminal className="w-3 h-3" />
-                <span>Linux Terminal</span>
+                <span>Terminal</span>
               </button>
             </div>
           )}
+        </div>
 
-          {/* NEW / CUSTOM PROGRAM BUTTON (Student freedom) */}
+        {/* Right: Editor Actions (New, Examples, Copy, Download) */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* New Custom Program */}
           <button
             type="button"
             onClick={handleCreateBlankProgram}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-cyan-300 transition cursor-pointer text-[11px] font-medium"
-            title="Create a new blank program to write your own custom code"
+            className="flex items-center gap-1 px-2 py-1 rounded-md border border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer text-[11px]"
+            title="Create a new blank program template"
           >
-            <Plus className="w-3.5 h-3.5 text-cyan-400" />
-            <span>New Custom Program</span>
+            <Plus className="w-3 h-3 text-cyan-400" />
+            <span className="hidden sm:inline">New</span>
           </button>
 
-          {/* Example Programs Dropdown */}
+          {/* Examples & Templates Dropdown */}
           <div className="relative">
             <button
               type="button"
               onClick={() => setShowExamples(!showExamples)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 transition cursor-pointer text-[11px]"
+              className="flex items-center gap-1 px-2 py-1 rounded-md border border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer text-[11px]"
             >
               <FolderOpen className="w-3 h-3 text-cyan-400" />
-              <span>Examples & Templates</span>
+              <span className="hidden sm:inline">Examples</span>
             </button>
 
             {showExamples && (
-              <div className="absolute left-0 mt-1 w-72 rounded-xl border border-slate-800 bg-slate-900 p-1.5 shadow-2xl z-30">
+              <div className="absolute right-0 mt-1 w-72 rounded-xl border border-slate-800 bg-slate-950 p-1.5 shadow-2xl z-30">
                 <span className="text-[10px] uppercase font-bold text-slate-400 px-2 py-1 block">
-                  Select {board.toUpperCase()} Program
+                  Select {board.toUpperCase()} Template
                 </span>
                 {EXAMPLE_PROGRAMS[board]?.map((ex, idx) => (
                   <button
                     key={idx}
                     type="button"
                     onClick={() => handleInsertExample(ex.code)}
-                    className="w-full text-left px-2 py-1.5 rounded-lg text-xs text-slate-200 hover:bg-slate-800 hover:text-cyan-400 transition"
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-200 hover:bg-slate-900 hover:text-cyan-400 transition cursor-pointer"
                   >
                     {ex.title}
                   </button>
@@ -879,75 +954,21 @@ void loop() {
             )}
           </div>
 
-          {onSaveProject && (
-            <button
-              type="button"
-              onClick={onSaveProject}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-300 transition cursor-pointer text-[11px]"
-            >
-              <Save className="w-3 h-3 text-emerald-400" />
-              <span>Save</span>
-            </button>
-          )}
-        </div>
-
-        {/* Action Controls: Compile, Run, Stop, Copy, Download */}
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={handleCompileCheck}
-            disabled={compileStatus === 'checking'}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 transition cursor-pointer text-[11px]"
-            title="Check Code Syntax"
-          >
-            <CheckCircle className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Check</span>
-          </button>
-
-          {!isSimulating ? (
-            <button
-              type="button"
-              onClick={() => {
-                onRunSimulation();
-              }}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-[11px] transition cursor-pointer shadow-md shadow-emerald-600/20"
-            >
-              <Play className="w-3.5 h-3.5 fill-current" />
-              <span>{board === 'raspberry_pi' ? 'Execute in Linux' : 'Run Simulation'}</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onStopSimulation}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-[11px] transition cursor-pointer shadow-md shadow-rose-600/20"
-            >
-              <Square className="w-3.5 h-3.5 fill-current" />
-              <span>Stop</span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={onResetSimulation}
-            className="p-1 rounded-lg border border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
-            title="Reset Board & Simulation"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-          </button>
-
+          {/* Copy Code */}
           <button
             type="button"
             onClick={handleCopy}
-            className="p-1 rounded-lg border border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
-            title="Copy Code"
+            className="p-1 rounded-md border border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
+            title="Copy Code to Clipboard"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
           </button>
 
+          {/* Download File */}
           <button
             type="button"
             onClick={handleDownload}
-            className="p-1 rounded-lg border border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
+            className="p-1 rounded-md border border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
             title="Download Code File"
           >
             <Download className="w-3.5 h-3.5" />
@@ -955,10 +976,10 @@ void loop() {
         </div>
       </div>
 
-      {/* Compiler feedback toast */}
+      {/* Compiler feedback toast (if active) */}
       {compileStatus !== 'idle' && (
         <div
-          className={`px-3 py-1.5 text-xs flex items-center gap-2 border-b ${
+          className={`px-3 py-1 text-xs flex items-center gap-2 border-b shrink-0 ${
             compileStatus === 'passed'
               ? 'bg-emerald-950/60 border-emerald-500/30 text-emerald-300'
               : compileStatus === 'error'
@@ -966,117 +987,219 @@ void loop() {
               : 'bg-cyan-950/60 border-cyan-500/30 text-cyan-300'
           }`}
         >
-          {compileStatus === 'passed' && <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+          {compileStatus === 'passed' && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
           {compileStatus === 'error' && <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />}
           {compileStatus === 'checking' && <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0 animate-spin" />}
-          <span>{compileMessage || 'Analyzing program syntax...'}</span>
+          <span>{compileMessage || 'Analyzing syntax...'}</span>
         </div>
       )}
 
-      {/* 2. Main Workspace: Either Code Editor or Linux Terminal */}
-      {activeView === 'editor' ? (
-        <div className="relative flex-1 flex min-h-[360px] max-h-[540px] font-mono text-xs overflow-auto">
-          {/* Line Numbers Bar */}
-          <div className="select-none py-3 px-2 bg-slate-950/90 text-slate-600 text-right font-mono text-[11px] border-r border-slate-900 w-10 shrink-0">
-            {lineNumbers.map((num) => (
-              <div key={num} className="leading-5">
-                {num}
-              </div>
-            ))}
-          </div>
-
-          {/* Textarea code editor */}
-          <textarea
-            ref={textareaRef}
-            value={code}
-            onChange={(e) => onChangeCode(e.target.value)}
-            spellCheck={false}
-            className="flex-1 w-full bg-slate-950 text-cyan-100 p-3 leading-5 resize-none focus:outline-none focus:ring-0 font-mono text-xs selection:bg-cyan-500/30"
-            placeholder={
-              board === 'rp2040_pico'
-                ? '# Write your Raspberry Pi Pico MicroPython or C/C++ program here...'
-                : board === 'raspberry_pi'
-                ? '# Write your Raspberry Pi Linux Python or C/C++ program here...'
-                : '// Write your Arduino / ESP32 C++ program here...'
-            }
-          />
-        </div>
-      ) : (
-        /* Linux Terminal Shell for Raspberry Pi Single-Board Computer */
-        <div className="flex-1 flex flex-col min-h-[360px] max-h-[540px] bg-black text-emerald-400 font-mono text-xs p-3 overflow-hidden">
-          <div className="flex items-center justify-between pb-2 border-b border-emerald-900/50 text-[11px] text-emerald-600">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80 inline-block" />
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block" />
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block" />
-              <span className="ml-2 text-emerald-400 font-bold">pi@raspberrypi:~ (Linux bash)</span>
+      {/* 2. Main Workspace Body: File Explorer + Editor / Terminal View */}
+      <div className="flex-1 min-h-0 flex overflow-hidden">
+        {/* Collapsible File Explorer Panel */}
+        {showFileExplorer && (
+          <div className="w-44 border-r border-slate-800 bg-slate-950/80 p-2 text-xs flex flex-col shrink-0 select-none">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1 py-1 mb-1">
+              Project Explorer
             </div>
-            <div className="flex items-center gap-2">
+            <div className="space-y-0.5 flex-1 overflow-y-auto">
               <button
                 type="button"
-                onClick={() => handleRunTerminalCommand('pinout')}
-                className="hover:text-emerald-300 text-[10px] cursor-pointer"
+                onClick={() => {
+                  setActiveFile('sketch');
+                  setActiveView('editor');
+                }}
+                className={`w-full text-left px-2 py-1.5 rounded-md flex items-center gap-2 text-[11px] font-mono transition cursor-pointer ${
+                  activeFile === 'sketch' && activeView === 'editor'
+                    ? 'bg-slate-800 text-cyan-300 font-semibold'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
               >
-                [pinout]
+                <FileCode className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <span className="truncate">{mainSketchName}</span>
               </button>
+
               <button
                 type="button"
-                onClick={() => handleRunTerminalCommand('vcgencmd measure_temp')}
-                className="hover:text-emerald-300 text-[10px] cursor-pointer"
+                onClick={() => setActiveFile('pins')}
+                className={`w-full text-left px-2 py-1.5 rounded-md flex items-center gap-2 text-[11px] font-mono transition cursor-pointer ${
+                  activeFile === 'pins'
+                    ? 'bg-slate-800 text-cyan-300 font-semibold'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
               >
-                [temp]
+                <Cpu className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="truncate">pins.h</span>
               </button>
+
               <button
                 type="button"
-                onClick={() => setTerminalHistory([])}
-                className="hover:text-emerald-300 text-[10px] cursor-pointer"
+                onClick={() => setActiveFile('readme')}
+                className={`w-full text-left px-2 py-1.5 rounded-md flex items-center gap-2 text-[11px] font-mono transition cursor-pointer ${
+                  activeFile === 'readme'
+                    ? 'bg-slate-800 text-cyan-300 font-semibold'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
               >
-                [clear]
+                <FileText className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span className="truncate">README.md</span>
               </button>
             </div>
+            <div className="pt-2 border-t border-slate-900 text-[10px] text-slate-400 px-1">
+              {boardDef.name}
+            </div>
           </div>
+        )}
 
-          {/* Terminal Output */}
-          <div className="flex-1 overflow-y-auto py-2 space-y-1 select-text">
-            {terminalHistory.map((line, idx) => (
-              <div key={idx} className="whitespace-pre-wrap leading-relaxed">
-                {line}
+        {/* Editor Workspace Center Area */}
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
+          {activeFile === 'pins' ? (
+            /* Read-Only Pin Map Viewer */
+            <div className="flex-1 min-h-0 overflow-auto p-3 bg-slate-950 text-slate-300 font-mono text-xs overscroll-contain">
+              <div className="text-cyan-400 font-bold pb-2 border-b border-slate-800 mb-2 flex items-center gap-1.5">
+                <Cpu className="w-4 h-4" />
+                <span>// {boardDef.name} - Available Hardware Pin Map (pins.h)</span>
               </div>
-            ))}
-            <div ref={terminalEndRef} />
-          </div>
+              <div className="space-y-1">
+                {boardDef.availablePins.map((p) => (
+                  <div key={p.id} className="flex items-center gap-4 py-0.5 hover:bg-slate-900/60 px-1 rounded">
+                    <span className="text-cyan-300 font-bold w-20">{p.name}</span>
+                    <span className="text-slate-400 w-16">[{p.type}]</span>
+                    <span className="text-emerald-400 w-12">{p.voltage}</span>
+                    <span className="text-slate-400 italic">{p.description}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : activeFile === 'readme' ? (
+            /* Read-Only README Documentation */
+            <div className="flex-1 min-h-0 overflow-auto p-4 bg-slate-950 text-slate-300 font-sans text-xs space-y-3 overscroll-contain">
+              <div className="text-white font-bold text-sm pb-1.5 border-b border-slate-800 flex items-center gap-2">
+                <FileText className="w-4 h-4 text-emerald-400" />
+                <span>Virtual Hardware Lab Guide ({boardDef.name})</span>
+              </div>
+              <div className="space-y-2 text-slate-300 leading-relaxed">
+                <p>
+                  <strong>Development Workflow:</strong>
+                </p>
+                <ol className="list-decimal list-inside space-y-1 text-slate-400 pl-1">
+                  <li>Configure hardware target with the searchable board selector.</li>
+                  <li>Write or adapt firmware in the Code Editor (C/C++ or MicroPython/Python).</li>
+                  <li>Click <span className="text-teal-400 font-semibold">&ldquo;Verify&rdquo;</span> to run toolchain syntax checking.</li>
+                  <li>Click <span className="text-emerald-400 font-semibold">&ldquo;Run Simulation&rdquo;</span> to start the virtual circuit.</li>
+                  <li>Observe live GPIO signal changes on the breadboard and print statements in the Serial Monitor.</li>
+                </ol>
+              </div>
+            </div>
+          ) : activeView === 'editor' ? (
+            /* Main Code Editor Textarea */
+            <div className="relative flex-1 min-h-0 flex font-mono text-xs overflow-auto overscroll-contain">
+              {/* Line Numbers Bar */}
+              <div className="select-none py-3 px-2 bg-slate-950/90 text-slate-600 text-right font-mono text-[11px] border-r border-slate-900 w-10 shrink-0">
+                {lineNumbers.map((num) => (
+                  <div key={num} className="leading-5">
+                    {num}
+                  </div>
+                ))}
+              </div>
 
-          {/* Interactive Shell Input Form */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleRunTerminalCommand(terminalInput);
-            }}
-            className="flex items-center gap-2 pt-2 border-t border-emerald-900/50"
-          >
-            <span className="text-emerald-500 font-bold shrink-0">pi@raspberrypi:~$</span>
-            <input
-              type="text"
-              value={terminalInput}
-              onChange={(e) => setTerminalInput(e.target.value)}
-              placeholder="e.g. python3 main.py, pinout, uname -a..."
-              className="flex-1 bg-transparent text-emerald-300 font-mono text-xs focus:outline-none"
-            />
-          </form>
+              {/* Textarea code editor */}
+              <textarea
+                ref={textareaRef}
+                value={code}
+                onChange={(e) => onChangeCode(e.target.value)}
+                spellCheck={false}
+                className="flex-1 w-full bg-slate-950 text-cyan-100 p-3 leading-5 resize-none focus:outline-none focus:ring-0 font-mono text-xs selection:bg-cyan-500/30 overflow-y-auto overscroll-contain"
+                placeholder={
+                  board === 'rp2040_pico'
+                    ? '# Write your Raspberry Pi Pico MicroPython or C/C++ program here...'
+                    : board === 'raspberry_pi'
+                    ? '# Write your Raspberry Pi Linux Python or C/C++ program here...'
+                    : '// Write your Arduino / ESP32 C++ program here...'
+                }
+              />
+            </div>
+          ) : (
+            /* Linux Terminal Shell for Raspberry Pi Single-Board Computer */
+            <div className="flex-1 flex flex-col min-h-0 bg-black text-emerald-400 font-mono text-xs p-3 overflow-hidden overscroll-contain">
+              <div className="flex items-center justify-between pb-2 border-b border-emerald-900/50 text-[11px] text-emerald-600">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80 inline-block" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block" />
+                  <span className="ml-2 text-emerald-400 font-bold">pi@raspberrypi:~ (Linux bash)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleRunTerminalCommand('pinout')}
+                    className="hover:text-emerald-300 text-[10px] cursor-pointer"
+                  >
+                    [pinout]
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRunTerminalCommand('vcgencmd measure_temp')}
+                    className="hover:text-emerald-300 text-[10px] cursor-pointer"
+                  >
+                    [temp]
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTerminalHistory([])}
+                    className="hover:text-emerald-300 text-[10px] cursor-pointer"
+                  >
+                    [clear]
+                  </button>
+                </div>
+              </div>
+
+              {/* Terminal Output */}
+              <div
+                ref={terminalContainerRef}
+                onScroll={handleTerminalScroll}
+                className="flex-1 overflow-y-auto py-2 space-y-1 select-text overscroll-contain"
+              >
+                {terminalHistory.map((line, idx) => (
+                  <div key={idx} className="whitespace-pre-wrap leading-relaxed">
+                    {line}
+                  </div>
+                ))}
+              </div>
+
+              {/* Interactive Shell Input Form */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleRunTerminalCommand(terminalInput);
+                }}
+                className="flex items-center gap-2 pt-2 border-t border-emerald-900/50"
+              >
+                <span className="text-emerald-500 font-bold shrink-0">pi@raspberrypi:~$</span>
+                <input
+                  type="text"
+                  value={terminalInput}
+                  onChange={(e) => setTerminalInput(e.target.value)}
+                  placeholder="e.g. python3 main.py, pinout, uname -a..."
+                  className="flex-1 bg-transparent text-emerald-300 font-mono text-xs focus:outline-none"
+                />
+              </form>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* 3. Status Bar */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-slate-900/80 border-t border-slate-800 text-[11px] text-slate-400 font-mono">
+      <div className="flex items-center justify-between px-3 py-1 bg-slate-900/90 border-t border-slate-800 text-[10px] text-slate-400 font-mono select-none">
         <div className="flex items-center gap-3">
-          <span>Lines: {lineCount}</span>
-          <span>Chars: {code.length}</span>
-          <span className="text-cyan-400">Target: {board.toUpperCase()}</span>
+          <span>Ln {lineCount}</span>
+          <span>Chars {code.length}</span>
+          <span className="text-cyan-400 font-semibold">{mainSketchName}</span>
         </div>
         <div className="flex items-center gap-2">
           {isSimulating ? (
             <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               <span>Simulation Running</span>
             </span>
           ) : (

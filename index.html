@@ -5,10 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Innolink Technologies</title>
     <meta name="description" content="Innolink Technologies - Premier electronics LMS, Coding & Hardware Lab, and STEM Marketplace powered by Mk solutions. Learn, build, test, and innovate." />
+    <meta property="og:site_name" content="Innolink Technologies" />
     <meta property="og:title" content="Innolink Technologies" />
     <meta property="og:description" content="Innolink Technologies - Premier electronics LMS, Coding & Hardware Lab, and STEM Marketplace powered by Mk solutions. Learn, build, test, and innovate." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Innolink Technologies" />
+    <meta name="twitter:description" content="Innolink Technologies - Premier electronics LMS, Coding & Hardware Lab, and STEM Marketplace powered by Mk solutions. Learn, build, test, and innovate." />
     <meta name="theme-color" content="#0f172a" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -16,6 +19,36 @@
     <meta name="apple-mobile-web-app-title" content="Innolink Technologies" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <!-- Structured Data (JSON-LD) for Schema.org SEO -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "EducationalOrganization",
+          "@id": "https://innolink.tech/#organization",
+          "name": "Innolink Technologies",
+          "description": "Premier electronics LMS, Coding & Hardware Lab, and STEM Marketplace powered by Mk solutions.",
+          "url": "/",
+          "logo": "/icon.svg",
+          "sameAs": []
+        },
+        {
+          "@type": "WebApplication",
+          "@id": "https://innolink.tech/#webapp",
+          "name": "Innolink Virtual Hardware Lab & Arduino IDE",
+          "applicationCategory": "EducationalApplication",
+          "operatingSystem": "All modern web browsers",
+          "description": "Interactive electronics development environment with Arduino IDE workflow, virtual breadboard circuit simulator, and Scratch/Blockly visual programming.",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "INR"
+          }
+        }
+      ]
+    }
+    </script>
     <!-- Google APIs script for Google Picker and Workspace Integrations -->
     <script src="https://apis.google.com/js/api.js" async defer></script>
   </head>

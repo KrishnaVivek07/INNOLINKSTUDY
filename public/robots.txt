@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Allow: /courses
+Allow: /course_details
+Allow: /coding_lab
+Allow: /marketplace
+Disallow: /admin_dashboard
+Disallow: /student_dashboard
+Disallow: /test
+Disallow: /api/
+Disallow: /uploads/private/
+
+# Sitemap location
+Sitemap: /sitemap.xml

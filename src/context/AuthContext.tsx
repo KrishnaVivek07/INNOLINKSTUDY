@@ -488,8 +488,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       (cleanId === 'kkscreative' ||
         cleanId === 'kkscreative@innolink.tech' ||
         cleanId === 'owner' ||
+        cleanId === 'admin' ||
         cleanId === 'kks' ||
-        cleanId === 'kks creative') &&
+        cleanId === 'kks creative' ||
+        cleanId === 'karthikeyaprabhala2005@gmail.com') &&
       cleanPass === 'kks@2026';
 
     if ((!serverRes || !serverRes.ok || !serverData?.success) && !isDefaultOwner) {

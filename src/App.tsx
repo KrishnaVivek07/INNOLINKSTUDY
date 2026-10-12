@@ -20,7 +20,20 @@ import { TestPage } from './pages/TestPage';
 import { AdminDashboard, AdminTab } from './pages/AdminDashboard';
 import { CodingLabPage } from './pages/CodingLabPage';
 import { MarketplacePage } from './pages/MarketplacePage';
+import { NotFoundPage } from './pages/NotFoundPage';
 import { MarketplaceProvider } from './context/MarketplaceContext';
+
+const VALID_TABS = new Set([
+  'home',
+  'courses',
+  'course_details',
+  'lesson',
+  'test',
+  'student_dashboard',
+  'admin_dashboard',
+  'coding_lab',
+  'marketplace',
+]);
 
 // Access Gate when unauthorized user attempts to view a protected portal
 const AccessRequiredGate: React.FC<{
@@ -78,8 +91,32 @@ function AppContent() {
   const { currentUser, role, isAdmin, isStudent } = useAuth();
   const { courses } = useLMS();
 
-  // Active navigation tab
-  const [activeTab, setActiveTab] = useState<string>('home');
+  // Active navigation tab with hash synchronization
+  const [activeTab, setActiveTabState] = useState<string>(() => {
+    const hash = window.location.hash.replace(/^#\/?/, '').trim();
+    if (!hash) return 'home';
+    return hash;
+  });
+
+  const setActiveTab = (tab: string) => {
+    setActiveTabState(tab);
+    if (window.location.hash.replace(/^#\/?/, '') !== tab) {
+      window.location.hash = tab === 'home' ? '' : `#${tab}`;
+    }
+  };
+
+  React.useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace(/^#\/?/, '').trim();
+      if (!hash) {
+        setActiveTabState('home');
+      } else {
+        setActiveTabState(hash);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   // Selected entities for deep-linked views
   const [selectedCourseId, setSelectedCourseId] = useState<string>(courses[0]?.id || 'course-elec-101');
@@ -185,6 +222,10 @@ function AppContent() {
             onBack={() => setActiveTab('course_details')}
             onNavigateToLesson={(cId, nextLesId) => handleNavigateToLesson(cId, nextLesId)}
             onNavigateToTest={(cId, testId) => handleNavigateToTest(cId, testId)}
+            onNavigateToLab={() => {
+              setActiveTab('coding_lab');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
           />
         )}
 
@@ -253,6 +294,14 @@ function AppContent() {
             onNavigateToCourse={handleNavigateToCourse}
             openAuthModal={openAuthModal}
             targetProductId={selectedMarketplaceKitId}
+          />
+        )}
+
+        {/* Custom 404 Route Not Found Error Experience */}
+        {!VALID_TABS.has(activeTab) && (
+          <NotFoundPage
+            onNavigateHome={() => setActiveTab('home')}
+            onNavigateToTab={(target) => setActiveTab(target)}
           />
         )}
       </main>

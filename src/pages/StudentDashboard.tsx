@@ -12,6 +12,10 @@ import {
   ClipboardList,
   FileCheck,
   CheckCircle2,
+  CheckCircle,
+  BarChart3,
+  Percent,
+  Sparkles,
   Key,
   ShieldCheck,
   ChevronRight,
@@ -175,6 +179,45 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   // Student Test Attempts & History
   const studentAttempts = testAttempts.filter((a) => a.studentId === studentUid);
 
+  // Overall & Per-course Progress Tracking Analytics
+  const enrolledCoursesProgress = enrolledCourses.map((course) => {
+    const courseLessons = lessons.filter((l) => l.courseId === course.id);
+    const courseTestsList = tests.filter((t) => t.courseId === course.id);
+    const prog = getCourseProgress(course.id);
+    const completedLessonCount = prog.completedLessons?.length || 0;
+    const passedTestCount = prog.completedTests?.length || 0;
+    const totalLessonsCount = courseLessons.length;
+    const totalTestsCount = courseTestsList.length;
+    const totalTrackableItems = totalLessonsCount + totalTestsCount;
+    const completedItems = completedLessonCount + passedTestCount;
+    const computedPercentage = totalTrackableItems > 0
+      ? Math.min(100, Math.round((completedItems / totalTrackableItems) * 100))
+      : prog.percentage;
+
+    return {
+      course,
+      progress: {
+        ...prog,
+        percentage: computedPercentage,
+      },
+      completedLessonCount,
+      totalLessonsCount,
+      passedTestCount,
+      totalTestsCount,
+      totalTrackableItems,
+      isCompleted: computedPercentage >= 100 || prog.isCompleted,
+    };
+  });
+
+  const totalFinishedLessons = enrolledCoursesProgress.reduce((sum, item) => sum + item.completedLessonCount, 0);
+  const totalAllLessons = enrolledCoursesProgress.reduce((sum, item) => sum + item.totalLessonsCount, 0);
+  const totalPassedTests = enrolledCoursesProgress.reduce((sum, item) => sum + item.passedTestCount, 0);
+  const totalAllTests = enrolledCoursesProgress.reduce((sum, item) => sum + item.totalTestsCount, 0);
+  const totalCompletedCourses = enrolledCoursesProgress.filter((item) => item.isCompleted).length;
+  const overallCurriculumPercentage = (totalAllLessons + totalAllTests) > 0
+    ? Math.min(100, Math.round(((totalFinishedLessons + totalPassedTests) / (totalAllLessons + totalAllTests)) * 100))
+    : (enrolledCoursesProgress.length > 0 ? enrolledCoursesProgress[0].progress.percentage : 0);
+
   const handleRedeem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!keyInput.trim()) return;
@@ -314,6 +357,108 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
         </div>
       )}
 
+      {/* 2.7 OVERALL CURRICULUM PROGRESS TRACKING */}
+      <section className="p-5 sm:p-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-xs space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="p-1 rounded bg-[var(--surface-secondary)] text-[var(--foreground)] border border-[var(--border)]">
+                <BarChart3 className="w-4 h-4" />
+              </span>
+              <h2 className="text-base sm:text-lg font-bold text-[var(--foreground)] tracking-tight">
+                Curriculum Progress Tracking
+              </h2>
+            </div>
+            <p className="text-xs text-[var(--muted-text)]">
+              Real-time completion metrics calculated from finished lessons and passed module assessments across enrolled courses.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-4 bg-[var(--surface-secondary)] px-4 py-2.5 rounded-xl border border-[var(--border)] shrink-0">
+            <div className="text-right">
+              <div className="text-[11px] font-semibold text-[var(--muted-text)] uppercase tracking-wider">Overall Completion</div>
+              <div className="text-xl sm:text-2xl font-black text-[var(--foreground)] font-mono leading-none">
+                {overallCurriculumPercentage}%
+              </div>
+            </div>
+            <div className="w-10 h-10 rounded-full border-2 border-[var(--border)] flex items-center justify-center bg-[var(--surface)] shrink-0 font-bold text-xs text-[var(--foreground)]">
+              <Percent className="w-4 h-4 text-emerald-500" />
+            </div>
+          </div>
+        </div>
+
+        {/* Aggregate KPI Chips */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="p-3.5 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]">
+            <div className="flex items-center gap-1.5 text-xs text-[var(--muted-text)] font-medium">
+              <BookOpen className="w-3.5 h-3.5 text-blue-500" />
+              <span>Finished Lessons</span>
+            </div>
+            <div className="mt-2 text-lg sm:text-xl font-bold text-[var(--foreground)] font-mono">
+              {totalFinishedLessons} <span className="text-xs font-normal text-[var(--muted-text)]">/ {totalAllLessons}</span>
+            </div>
+            <div className="mt-1 text-[11px] text-[var(--muted-text)]">
+              {totalAllLessons > 0 ? Math.round((totalFinishedLessons / totalAllLessons) * 100) : 0}% lessons finished
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]">
+            <div className="flex items-center gap-1.5 text-xs text-[var(--muted-text)] font-medium">
+              <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Passed Tests</span>
+            </div>
+            <div className="mt-2 text-lg sm:text-xl font-bold text-[var(--foreground)] font-mono">
+              {totalPassedTests} <span className="text-xs font-normal text-[var(--muted-text)]">/ {totalAllTests}</span>
+            </div>
+            <div className="mt-1 text-[11px] text-[var(--muted-text)]">
+              {totalAllTests > 0 ? Math.round((totalPassedTests / totalAllTests) * 100) : 0}% quizzes cleared
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]">
+            <div className="flex items-center gap-1.5 text-xs text-[var(--muted-text)] font-medium">
+              <Award className="w-3.5 h-3.5 text-amber-500" />
+              <span>Completed Courses</span>
+            </div>
+            <div className="mt-2 text-lg sm:text-xl font-bold text-[var(--foreground)] font-mono">
+              {totalCompletedCourses} <span className="text-xs font-normal text-[var(--muted-text)]">/ {enrolledCourses.length}</span>
+            </div>
+            <div className="mt-1 text-[11px] text-[var(--muted-text)]">
+              {enrolledCourses.length > 0 && totalCompletedCourses === enrolledCourses.length
+                ? 'All courses certified'
+                : `${enrolledCourses.length - totalCompletedCourses} in progress`}
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)]">
+            <div className="flex items-center gap-1.5 text-xs text-[var(--muted-text)] font-medium">
+              <Clock className="w-3.5 h-3.5 text-purple-500" />
+              <span>Pending Tasks</span>
+            </div>
+            <div className="mt-2 text-lg sm:text-xl font-bold text-[var(--foreground)] font-mono">
+              {pendingTests.length + pendingAssignments.length}
+            </div>
+            <div className="mt-1 text-[11px] text-[var(--muted-text)]">
+              {pendingTests.length} tests • {pendingAssignments.length} assignments
+            </div>
+          </div>
+        </div>
+
+        {/* Global Progress Bar */}
+        <div className="space-y-1.5 pt-1">
+          <div className="flex items-center justify-between text-xs text-[var(--muted-text)]">
+            <span>Overall Curriculum Milestone</span>
+            <span className="font-semibold text-[var(--foreground)]">{overallCurriculumPercentage}% Completed</span>
+          </div>
+          <div className="h-2 w-full rounded-full bg-[var(--surface-secondary)] overflow-hidden border border-[var(--border)]">
+            <div
+              className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+              style={{ width: `${Math.max(2, overallCurriculumPercentage)}%` }}
+            />
+          </div>
+        </div>
+      </section>
+
       {/* 3. CONTINUE LEARNING */}
       <section className="space-y-3">
         <h2 className="text-base font-bold text-[var(--foreground)] tracking-tight">
@@ -343,17 +488,32 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                     </p>
                   )}
 
-                  {/* Clean progress bar */}
-                  <div className="pt-2 max-w-xs space-y-1">
-                    <div className="flex justify-between text-xs text-[var(--muted-text)]">
-                      <span>Progress</span>
-                      <span className="font-semibold text-[var(--foreground)]">{activeProgress?.percentage || 0}% complete</span>
+                  {/* Clean progress bar with detailed finished lessons & passed tests breakdown */}
+                  <div className="pt-2 max-w-sm space-y-1.5">
+                    <div className="flex justify-between items-center text-xs text-[var(--muted-text)]">
+                      <span className="flex items-center gap-1">
+                        <BarChart3 className="w-3 h-3 text-[var(--muted-text)]" />
+                        <span>Course Completion</span>
+                      </span>
+                      <span className="font-bold text-[var(--foreground)] font-mono">
+                        {activeProgress?.percentage || 0}%
+                      </span>
                     </div>
-                    <div className="h-1.5 w-48 sm:w-64 bg-[var(--surface-secondary)] rounded-full overflow-hidden border border-[var(--border)]">
+                    <div className="h-2 w-48 sm:w-72 bg-[var(--surface-secondary)] rounded-full overflow-hidden border border-[var(--border)]">
                       <div
-                        className="h-full bg-[var(--foreground)] rounded-full transition-all duration-300"
+                        className="h-full bg-emerald-500 rounded-full transition-all duration-300"
                         style={{ width: `${Math.max(2, activeProgress?.percentage || 0)}%` }}
                       />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px] text-[var(--muted-text)]">
+                      <span className="inline-flex items-center gap-1 font-medium bg-[var(--surface-secondary)] px-2 py-0.5 rounded border border-[var(--border)]">
+                        <BookOpen className="w-3 h-3 text-blue-500" />
+                        <span>{activeProgress?.completedLessons?.length || 0} / {activeLessons.length} lessons finished</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1 font-medium bg-[var(--surface-secondary)] px-2 py-0.5 rounded border border-[var(--border)]">
+                        <CheckCircle className="w-3 h-3 text-emerald-500" />
+                        <span>{activeProgress?.completedTests?.length || 0} / {tests.filter((t) => t.courseId === activeCourse.id).length} tests passed</span>
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -414,8 +574,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
           <p className="text-xs text-[var(--muted-text)] py-3">You are not enrolled in any course yet.</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {enrolledCourses.map((course) => {
-              const progress = getCourseProgress(course.id);
+            {enrolledCoursesProgress.map(({ course, progress, completedLessonCount, totalLessonsCount, passedTestCount, totalTestsCount, isCompleted }) => {
               return (
                 <div
                   key={course.id}
@@ -427,19 +586,63 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                       <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-semibold bg-[var(--surface)]/95 text-[var(--foreground)] border border-[var(--border)]">
                         {course.category}
                       </span>
+                      {isCompleted && (
+                        <span className="absolute top-2 right-2 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500 text-white flex items-center gap-1 shadow-xs">
+                          <CheckCircle className="w-3 h-3" />
+                          <span>Completed</span>
+                        </span>
+                      )}
                     </div>
 
-                    <div className="p-4 space-y-2">
-                      <h4 className="text-sm font-semibold text-[var(--foreground)] line-clamp-1">{course.title}</h4>
-                      <p className="text-xs text-[var(--muted-text)]">{course.mentorName}</p>
+                    <div className="p-4 space-y-3">
+                      <div>
+                        <h4 className="text-sm font-semibold text-[var(--foreground)] line-clamp-1">{course.title}</h4>
+                        <p className="text-xs text-[var(--muted-text)] mt-0.5">{course.mentorName}</p>
+                      </div>
 
-                      <div className="pt-2 space-y-1">
-                        <div className="flex justify-between text-xs text-[var(--muted-text)]">
-                          <span>Progress</span>
-                          <span className="font-semibold text-[var(--foreground)]">{progress.percentage}%</span>
+                      {/* Course Completion Breakdown */}
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-[var(--muted-text)] font-medium flex items-center gap-1">
+                            <BarChart3 className="w-3 h-3 text-[var(--muted-text)]" />
+                            <span>Progress</span>
+                          </span>
+                          <span className="font-bold text-[var(--foreground)] font-mono">{progress.percentage}%</span>
                         </div>
                         <div className="h-1.5 w-full rounded-full bg-[var(--surface-secondary)] overflow-hidden border border-[var(--border)]">
-                          <div className="h-full bg-[var(--foreground)] rounded-full" style={{ width: `${progress.percentage}%` }} />
+                          <div
+                            className={`h-full rounded-full transition-all duration-300 ${isCompleted ? 'bg-emerald-500' : 'bg-[var(--foreground)]'}`}
+                            style={{ width: `${Math.max(2, progress.percentage)}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Finished lessons and passed tests badge metrics */}
+                      <div className="grid grid-cols-2 gap-1.5 pt-1">
+                        <div className="p-2 rounded bg-[var(--surface-secondary)] border border-[var(--border)] text-center">
+                          <div className="text-[10px] text-[var(--muted-text)] uppercase tracking-wider flex items-center justify-center gap-1">
+                            <BookOpen className="w-2.5 h-2.5 text-blue-500" />
+                            <span>Lessons</span>
+                          </div>
+                          <div className="text-xs font-bold text-[var(--foreground)] font-mono mt-0.5">
+                            {completedLessonCount} / {totalLessonsCount}
+                          </div>
+                          <div className="text-[9px] text-[var(--muted-text)]">
+                            {totalLessonsCount > 0 ? Math.round((completedLessonCount / totalLessonsCount) * 100) : 0}% finished
+                          </div>
+                        </div>
+
+                        <div className="p-2 rounded bg-[var(--surface-secondary)] border border-[var(--border)] text-center">
+                          <div className="text-[10px] text-[var(--muted-text)] uppercase tracking-wider flex items-center justify-center gap-1">
+                            <CheckCircle className="w-2.5 h-2.5 text-emerald-500" />
+                            <span>Tests</span>
+                          </div>
+                          <div className="text-xs font-bold text-[var(--foreground)] font-mono mt-0.5">
+                            {passedTestCount} / {totalTestsCount}
+                          </div>
+                          <div className="text-[9px] text-[var(--muted-text)]">
+                            {totalTestsCount > 0 ? Math.round((passedTestCount / totalTestsCount) * 100) : 0}% passed
+                          </div>
                         </div>
                       </div>
                     </div>

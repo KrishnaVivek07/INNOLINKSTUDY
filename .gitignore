@@ -6,3 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+.owner_secure_credentials.json
+*.pem
+*.key
+*.cert
+*.p12

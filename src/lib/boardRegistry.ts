@@ -9,7 +9,7 @@ export interface BoardPin {
 export interface BoardDefinition {
   id: string;
   name: string;
-  family: 'arduino' | 'esp32' | 'raspberry_pi_pico' | 'raspberry_pi';
+  family: 'arduino' | 'esp32' | 'raspberry_pi_pico' | 'raspberry_pi' | 'stm32' | 'teensy' | string;
   category: 'microcontroller' | 'single_board_computer';
   mcu: string;
   flashSize: string;
@@ -265,6 +265,60 @@ export const BOARD_REGISTRY: Record<string, BoardDefinition> = {
       { id: '3V3', name: '3.3V Power', type: 'power', voltage: '3.3V', description: 'Pin 1 / Pin 17' },
       { id: '5V', name: '5V Power', type: 'power', voltage: '5V', description: 'Pin 2 / Pin 4' },
       { id: 'GND', name: 'GND', type: 'ground', voltage: '0V', description: 'System Ground (Pin 6, 9, 14, 20, 25)' },
+    ],
+  },
+  stm32: {
+    id: 'stm32',
+    name: 'STM32F103C8T6 (Blue Pill)',
+    family: 'stm32',
+    category: 'microcontroller',
+    mcu: 'ARM 32-bit Cortex-M3',
+    flashSize: '64 KB / 128 KB',
+    operatingVoltage: '3.3V',
+    clockSpeed: '72 MHz',
+    supportedLanguages: ['arduino_c', 'c_cpp'],
+    defaultBaudRate: 115200,
+    features: ['ARM Cortex-M3 @ 72MHz', '37 GPIOs', '2x 12-bit ADC', 'Hardware USB / CAN', 'DMA Channels'],
+    availablePins: [
+      { id: 'PA0', name: 'PA0 (ADC0)', type: 'analog', voltage: '3.3V', description: '12-bit ADC / Timer2 CH1 / Wakeup' },
+      { id: 'PA1', name: 'PA1 (ADC1)', type: 'analog', voltage: '3.3V', description: '12-bit ADC / Timer2 CH2' },
+      { id: 'PA2', name: 'PA2 (TX2)', type: 'uart', voltage: '3.3V', description: 'USART2 TX / Timer2 CH3' },
+      { id: 'PA3', name: 'PA3 (RX2)', type: 'uart', voltage: '3.3V', description: 'USART2 RX / Timer2 CH4' },
+      { id: 'PA9', name: 'PA9 (TX1)', type: 'uart', voltage: '3.3V', description: 'USART1 TX' },
+      { id: 'PA10', name: 'PA10 (RX1)', type: 'uart', voltage: '3.3V', description: 'USART1 RX' },
+      { id: 'PB6', name: 'PB6 (SCL1)', type: 'i2c', voltage: '3.3V', description: 'I2C1 SCL' },
+      { id: 'PB7', name: 'PB7 (SDA1)', type: 'i2c', voltage: '3.3V', description: 'I2C1 SDA' },
+      { id: 'PC13', name: 'PC13 (LED)', type: 'digital', voltage: '3.3V', description: 'Onboard User LED (Active LOW)' },
+      { id: '3V3', name: '3V3', type: 'power', voltage: '3.3V', description: '3.3V Power Output' },
+      { id: '5V', name: '5V', type: 'power', voltage: '5V', description: '5V Power Input' },
+      { id: 'GND', name: 'GND', type: 'ground', voltage: '0V', description: 'Ground Rail' },
+    ],
+  },
+  teensy: {
+    id: 'teensy',
+    name: 'Teensy 4.0 / 4.1 (ARM Cortex-M7)',
+    family: 'teensy',
+    category: 'microcontroller',
+    mcu: 'NXP i.MX RT1062 ARM Cortex-M7',
+    flashSize: '2 MB / 8 MB QSPI',
+    operatingVoltage: '3.3V',
+    clockSpeed: '600 MHz',
+    supportedLanguages: ['arduino_c', 'c_cpp'],
+    defaultBaudRate: 115200,
+    features: ['600 MHz ARM Cortex-M7 with FPU', '1024 KB RAM', 'Dual USB', 'Hardware DSP Instructions', 'Audio Engine'],
+    availablePins: [
+      { id: '0', name: 'Pin 0 (RX1)', type: 'uart', voltage: '3.3V', description: 'Serial1 RX / CS1' },
+      { id: '1', name: 'Pin 1 (TX1)', type: 'uart', voltage: '3.3V', description: 'Serial1 TX / MISO1' },
+      { id: '2', name: 'Pin 2', type: 'digital', voltage: '3.3V', description: 'Digital I/O / PWM' },
+      { id: '3', name: 'Pin 3', type: 'pwm', voltage: '3.3V', description: 'PWM Channel / CAN2 TX' },
+      { id: '13', name: 'Pin 13 (LED)', type: 'digital', voltage: '3.3V', description: 'Onboard Amber LED / SCK' },
+      { id: '14', name: 'Pin 14 (A0)', type: 'analog', voltage: '3.3V', description: '12-bit Analog Input A0' },
+      { id: '15', name: 'Pin 15 (A1)', type: 'analog', voltage: '3.3V', description: '12-bit Analog Input A1' },
+      { id: '18', name: 'Pin 18 (SDA0)', type: 'i2c', voltage: '3.3V', description: 'I2C0 SDA' },
+      { id: '19', name: 'Pin 19 (SCL0)', type: 'i2c', voltage: '3.3V', description: 'I2C0 SCL' },
+      { id: '3V3', name: '3.3V', type: 'power', voltage: '3.3V', description: '3.3V (250mA max)' },
+      { id: 'VIN', name: 'VIN', type: 'power', voltage: '5V', description: '5V Power Input' },
+      { id: 'GND', name: 'GND', type: 'ground', voltage: '0V', description: 'Ground Rail' },
     ],
   },
 };

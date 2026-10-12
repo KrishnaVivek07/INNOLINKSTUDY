@@ -83,8 +83,17 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex items-center justify-between h-14">
           {/* Logo with proper aspect-ratio and object-contain */}
           <div
+            role="button"
+            tabIndex={0}
             onClick={() => handleNavClick('home')}
-            className="flex items-center gap-2.5 cursor-pointer group select-none shrink-0"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleNavClick('home');
+              }
+            }}
+            aria-label="InnoLink Technologies Home"
+            className="flex items-center gap-2.5 cursor-pointer group select-none shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 rounded-lg p-0.5"
           >
             {branding.logoUrl ? (
               <img

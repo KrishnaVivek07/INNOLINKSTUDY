@@ -311,8 +311,28 @@ export interface WorkspaceMeetSession {
 // ==========================================
 // CODING & HARDWARE LAB TYPES
 // ==========================================
-export type HardwareBoard = 'arduino_uno' | 'esp32' | 'rp2040_pico' | 'raspberry_pi';
-export type CodingLabLanguage = 'arduino_c' | 'micropython' | 'python' | 'c_cpp' | 'blocks' | 'hybrid';
+export type HardwareBoard =
+  | 'arduino_uno'
+  | 'arduino_nano'
+  | 'arduino_mega'
+  | 'esp32'
+  | 'esp32_c3'
+  | 'rp2040_pico'
+  | 'rp2040_pico_w'
+  | 'raspberry_pi'
+  | 'stm32'
+  | 'teensy'
+  | string;
+export type CodingLabLanguage =
+  | 'arduino_c'
+  | 'micropython'
+  | 'python'
+  | 'c_cpp'
+  | 'c'
+  | 'cpp'
+  | 'java'
+  | 'blocks'
+  | 'hybrid';
 
 export interface SimulatedComponent {
   id: string;
@@ -333,7 +353,9 @@ export interface SimulatedComponent {
     | 'dht_sensor'
     | 'lcd_16x2'
     | 'oled_i2c'
-    | 'dc_motor';
+    | 'dc_motor'
+    | 'multimeter'
+    | string;
   label: string;
   color?: string;
   state?: {
@@ -347,7 +369,24 @@ export interface SimulatedComponent {
     humidity?: number;
     distance?: number;
   };
-  pins: Record<string, string>; // pinName -> boardPin
+  pins: Record<string, string | undefined>; // pinName -> boardPin
+  position?: { x: number; y: number; rotation?: number };
+}
+
+export interface WireEndpoint {
+  type: 'board' | 'component' | 'breadboard';
+  componentId?: string;
+  pinId: string;
+  label?: string;
+  x?: number;
+  y?: number;
+}
+
+export interface CircuitWire {
+  id: string;
+  from: WireEndpoint;
+  to: WireEndpoint;
+  color: 'red' | 'black' | 'blue' | 'green' | 'yellow' | 'orange' | 'white';
 }
 
 export interface CodingLab {
@@ -386,6 +425,7 @@ export interface CodingProject {
   code: string;
   blocksXmlOrJson?: string;
   components: SimulatedComponent[];
+  wires?: CircuitWire[];
   isSubmitted?: boolean;
   updatedAt: string;
   createdAt: string;
@@ -400,6 +440,7 @@ export interface LabSubmission {
   board: HardwareBoard;
   code: string;
   blocksData?: string;
+  wires?: CircuitWire[];
   simulationLog?: string;
   status: 'submitted' | 'reviewed' | 'passed' | 'needs_revision';
   marks?: number;

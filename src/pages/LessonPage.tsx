@@ -26,6 +26,7 @@ import {
   Layers,
   ChevronDown,
   ChevronRight,
+  Cpu,
 } from 'lucide-react';
 
 interface LessonPageProps {
@@ -34,6 +35,7 @@ interface LessonPageProps {
   onNavigateToLesson: (courseId: string, lessonId: string) => void;
   onNavigateToTest?: (courseId: string, testId: string) => void;
   onBack: () => void;
+  onNavigateToLab?: () => void;
 }
 
 export const LessonPage: React.FC<LessonPageProps> = ({
@@ -42,6 +44,7 @@ export const LessonPage: React.FC<LessonPageProps> = ({
   onNavigateToLesson,
   onNavigateToTest,
   onBack,
+  onNavigateToLab,
 }) => {
   const {
     courses,
@@ -70,7 +73,13 @@ export const LessonPage: React.FC<LessonPageProps> = ({
   const isCompleted = lesson && progress ? progress.completedLessons.includes(lesson.id) : false;
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<'overview' | 'summary' | 'transcript' | 'notes' | 'ask_ai' | 'assignment'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'interactive_lab' | 'summary' | 'transcript' | 'notes' | 'ask_ai' | 'assignment'>('overview');
+
+  // Interactive Electronics Lab State (Byju's-inspired active inquiry)
+  const [interactiveVoltage, setInteractiveVoltage] = useState<number>(5.0);
+  const [interactiveResistance, setInteractiveResistance] = useState<number>(220);
+  const [quizSelectedOption, setQuizSelectedOption] = useState<number | null>(null);
+  const [quizRevealed, setQuizRevealed] = useState<boolean>(false);
 
   // Real Video Player State & Ref
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -507,6 +516,17 @@ export const LessonPage: React.FC<LessonPageProps> = ({
               Overview
             </button>
             <button
+              onClick={() => setActiveTab('interactive_lab')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold whitespace-nowrap rounded-lg transition cursor-pointer ${
+                activeTab === 'interactive_lab'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Interactive Circuit & Practice</span>
+            </button>
+            <button
               onClick={() => setActiveTab('summary')}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold whitespace-nowrap rounded-lg transition cursor-pointer ${
                 activeTab === 'summary'
@@ -563,6 +583,247 @@ export const LessonPage: React.FC<LessonPageProps> = ({
 
           {/* TAB CONTENTS */}
           <div className="p-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-xs min-h-[260px]">
+            {/* 0. INTERACTIVE CIRCUIT SIMULATION & BYJU'S-STYLE PREDICTION PRACTICE */}
+            {activeTab === 'interactive_lab' && (
+              <div className="space-y-6">
+                {/* 1. Header with Learning Objective */}
+                <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-1.5">
+                  <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-xs font-bold uppercase tracking-wider">
+                    <Sparkles className="w-4 h-4" />
+                    <span>Learning Objective & Concept Inquiry</span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-[var(--foreground)] font-medium leading-relaxed">
+                    Explore Ohm's Law and current limiting in electronics. Adjust circuit parameters in real-time, predict behavior, and verify with electrical equations before wiring on a physical breadboard.
+                  </p>
+                </div>
+
+                {/* 2. Interactive Virtual Circuit Diagram & Simulator */}
+                <div className="p-5 rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)] space-y-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-[var(--foreground)] uppercase tracking-wider flex items-center gap-1.5">
+                      <Cpu className="w-4 h-4 text-cyan-500" />
+                      <span>Live DC Circuit Analyzer (Ohm's Law: V = I × R)</span>
+                    </span>
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[var(--surface)] text-[var(--foreground)] border border-[var(--border)]">
+                      Forward Diode Drop: 2.00 V (Fixed)
+                    </span>
+                  </div>
+
+                  {/* Interactive Sliders */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Voltage Slider */}
+                    <div className="p-3.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-[var(--foreground)]">Supply Voltage (V):</span>
+                        <span className="font-mono font-bold text-cyan-500">{interactiveVoltage.toFixed(1)} V</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="2.5"
+                        max="12.0"
+                        step="0.5"
+                        value={interactiveVoltage}
+                        onChange={(e) => setInteractiveVoltage(parseFloat(e.target.value))}
+                        className="w-full accent-cyan-500 cursor-pointer"
+                      />
+                      <div className="flex justify-between text-[10px] text-[var(--muted-text)] font-mono">
+                        <span>2.5V (3xAA)</span>
+                        <span>5.0V (USB/Uno)</span>
+                        <span>12.0V (VIN)</span>
+                      </div>
+                    </div>
+
+                    {/* Resistance Slider */}
+                    <div className="p-3.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-[var(--foreground)]">Current-Limiting Resistor:</span>
+                        <span className="font-mono font-bold text-amber-500">{interactiveResistance} Ω</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="100"
+                        max="2200"
+                        step="50"
+                        value={interactiveResistance}
+                        onChange={(e) => setInteractiveResistance(parseInt(e.target.value, 10))}
+                        className="w-full accent-amber-500 cursor-pointer"
+                      />
+                      <div className="flex justify-between text-[10px] text-[var(--muted-text)] font-mono">
+                        <span>100Ω (Low)</span>
+                        <span>220Ω (Standard)</span>
+                        <span>2.2kΩ (High)</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Live Calculations & Visual State */}
+                  {(() => {
+                    const effectiveV = Math.max(0, interactiveVoltage - 2.0);
+                    const currentMa = (effectiveV / interactiveResistance) * 1000;
+                    const powerMw = currentMa * interactiveVoltage;
+                    const isSafe = currentMa >= 5 && currentMa <= 20;
+                    const isOver = currentMa > 20;
+
+                    return (
+                      <div className="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                        {/* LED Visual State */}
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
+                              isOver
+                                ? 'bg-rose-500/90 border-rose-400 shadow-lg shadow-rose-500/50 animate-pulse'
+                                : currentMa > 0
+                                ? 'bg-emerald-500/80 border-emerald-400 shadow-md shadow-emerald-500/30'
+                                : 'bg-slate-700/50 border-slate-600'
+                            }`}
+                          >
+                            <span className="text-[10px] font-bold text-white uppercase">LED</span>
+                          </div>
+                          <div>
+                            <span className="text-xs font-bold block text-[var(--foreground)]">LED Status</span>
+                            <span
+                              className={`text-[11px] font-medium ${
+                                isOver
+                                  ? 'text-rose-500 font-semibold'
+                                  : isSafe
+                                  ? 'text-emerald-500 font-semibold'
+                                  : 'text-amber-500'
+                              }`}
+                            >
+                              {isOver
+                                ? '⚠ DANGER: Overcurrent (>20mA)'
+                                : isSafe
+                                ? '✓ Optimal Safe Operation'
+                                : 'Dim (Underdriven)'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Calculated Metrics */}
+                        <div className="space-y-1 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-[var(--muted-text)]">Loop Current:</span>
+                            <span className="font-mono font-bold text-[var(--foreground)]">{currentMa.toFixed(2)} mA</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-[var(--muted-text)]">Resistor Drop:</span>
+                            <span className="font-mono text-[var(--foreground)]">{effectiveV.toFixed(2)} V</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-[var(--muted-text)]">Total Power:</span>
+                            <span className="font-mono text-[var(--foreground)]">{powerMw.toFixed(1)} mW</span>
+                          </div>
+                        </div>
+
+                        {/* Equation Box */}
+                        <div className="p-2.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] text-[11px] font-mono leading-relaxed text-[var(--muted-text)]">
+                          <div>I = (V_sup - V_led) / R</div>
+                          <div className="text-[var(--foreground)] font-semibold">
+                            I = ({interactiveVoltage.toFixed(1)} - 2.0) / {interactiveResistance} = {(currentMa / 1000).toFixed(4)} A
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* 3. Checkpoint Prediction Challenge */}
+                <div className="p-5 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-4">
+                  <div className="flex items-center gap-2 text-xs font-bold text-[var(--foreground)] uppercase tracking-wider">
+                    <HelpCircle className="w-4 h-4 text-amber-500" />
+                    <span>Concept Prediction Checkpoint</span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-[var(--foreground)] font-medium">
+                    Question: If you increase the circuit resistor from 220Ω to 1000Ω while maintaining supply voltage at 5V, what will occur?
+                  </p>
+
+                  <div className="grid grid-cols-1 gap-2 pt-1">
+                    {[
+                      {
+                        idx: 0,
+                        text: 'A) Current increases to 50mA and the LED burns out immediately.',
+                        correct: false,
+                        explanation: 'Incorrect. By Ohm’s Law (I = V / R), increasing resistance decreases current, not increases.',
+                      },
+                      {
+                        idx: 1,
+                        text: 'B) Current decreases from ~13.6mA to ~3.0mA, causing the LED to dim safely.',
+                        correct: true,
+                        explanation: 'Correct! (5V - 2V) / 1000Ω = 3mA. Because resistance increased by ~4.5x, current drops proportionally and the LED glows dimmer.',
+                      },
+                      {
+                        idx: 2,
+                        text: 'C) The forward voltage drop across the diode rises to 5V to compensate.',
+                        correct: false,
+                        explanation: 'Incorrect. A standard LED maintains its characteristic bandgap forward drop (~2.0V) when forward biased.',
+                      },
+                      {
+                        idx: 3,
+                        text: 'D) Total loop current remains constant because diodes are non-linear.',
+                        correct: false,
+                        explanation: 'Incorrect. The series current-limiting resistor strictly dictates the allowable current according to Ohm’s Law.',
+                      },
+                    ].map((opt) => {
+                      const isSelected = quizSelectedOption === opt.idx;
+                      return (
+                        <button
+                          key={opt.idx}
+                          type="button"
+                          onClick={() => {
+                            setQuizSelectedOption(opt.idx);
+                            setQuizRevealed(true);
+                          }}
+                          className={`w-full text-left p-3 rounded-lg border text-xs transition cursor-pointer flex flex-col gap-1 ${
+                            isSelected
+                              ? opt.correct
+                                ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-semibold'
+                                : 'border-rose-500 bg-rose-500/10 text-rose-700 dark:text-rose-300'
+                              : 'border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--foreground)] hover:border-slate-500'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span>{opt.text}</span>
+                            {quizRevealed && isSelected && (
+                              <span className="text-[11px] font-bold">
+                                {opt.correct ? '✓ Correct' : '✕ Try Again'}
+                              </span>
+                            )}
+                          </div>
+                          {quizRevealed && isSelected && (
+                            <p className="text-[11px] mt-1 text-[var(--muted-text)] font-normal leading-relaxed">
+                              {opt.explanation}
+                            </p>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 4. Action: Open in Virtual Hardware Coding Lab */}
+                <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <span className="text-xs font-bold text-[var(--foreground)] block">Ready for Hands-On Practice?</span>
+                    <span className="text-[11px] text-[var(--muted-text)]">
+                      Wire this circuit on our virtual breadboard with Arduino Uno, ESP32, or Raspberry Pi Pico.
+                    </span>
+                  </div>
+
+                  {onNavigateToLab && (
+                    <button
+                      type="button"
+                      onClick={onNavigateToLab}
+                      className="px-4 py-2 rounded-lg bg-[var(--foreground)] text-[var(--background)] hover:opacity-90 font-semibold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shrink-0 shadow-xs"
+                    >
+                      <Cpu className="w-3.5 h-3.5" />
+                      <span>Open Virtual Hardware Lab</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* 1. OVERVIEW */}
             {activeTab === 'overview' && (
               <div className="space-y-4">

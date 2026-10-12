@@ -48,6 +48,8 @@ import {
   Video,
   DollarSign,
   AlertTriangle,
+  FolderOpen,
+  AlertCircle,
   Send,
   Edit,
   Truck,
@@ -56,6 +58,9 @@ import {
   Globe,
   RotateCcw,
   FileText,
+  ArrowUp,
+  ArrowDown,
+  X,
 } from 'lucide-react';
 import { getTermsAndConditions, saveTermsAndConditions } from '../services/termsService';
 import { TermsModal } from '../components/terms/TermsModal';
@@ -308,6 +313,82 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [generatedKeyConcepts, setGeneratedKeyConcepts] = useState<string[]>([]);
   const [videoPublishedSuccess, setVideoPublishedSuccess] = useState(false);
 
+  // Priority 2: Direct Video File Upload State
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoUploadProgress, setVideoUploadProgress] = useState<number>(0);
+  const [videoUploadStatus, setVideoUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [videoUploadError, setVideoUploadError] = useState<string | null>(null);
+  const [showManualUrl, setShowManualUrl] = useState<boolean>(false);
+
+  const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate video format
+    const validExts = ['.mp4', '.webm', '.mov', '.mkv'];
+    const hasValidExt = validExts.some((ext) => file.name.toLowerCase().endsWith(ext));
+    if (!hasValidExt && !file.type.startsWith('video/')) {
+      setVideoUploadError('Invalid format. Please select an MP4, WebM, or MOV video file.');
+      return;
+    }
+
+    setVideoFile(file);
+    setVideoUploadProgress(0);
+    setVideoUploadStatus('idle');
+    setVideoUploadError(null);
+  };
+
+  const handleUploadVideoFile = () => {
+    if (!videoFile) return;
+
+    setVideoUploadStatus('uploading');
+    setVideoUploadProgress(0);
+    setVideoUploadError(null);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/upload-video', true);
+    xhr.setRequestHeader('Content-Type', videoFile.type || 'video/mp4');
+    xhr.setRequestHeader('x-filename', encodeURIComponent(videoFile.name));
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const percent = Math.round((e.loaded / e.total) * 100);
+        setVideoUploadProgress(percent);
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const res = JSON.parse(xhr.responseText);
+          setVideoUrl(res.url);
+          setVideoUploadStatus('success');
+          showToast(`Video "${videoFile.name}" uploaded successfully!`);
+        } catch {
+          setVideoUploadStatus('error');
+          setVideoUploadError('Failed to parse upload response.');
+        }
+      } else {
+        setVideoUploadStatus('error');
+        setVideoUploadError(`Upload failed with server status ${xhr.status}.`);
+      }
+    };
+
+    xhr.onerror = () => {
+      setVideoUploadStatus('error');
+      setVideoUploadError('Network error during video upload. Please check connection and retry.');
+    };
+
+    xhr.send(videoFile);
+  };
+
+  const handleRemoveVideoFile = () => {
+    setVideoFile(null);
+    setVideoUploadProgress(0);
+    setVideoUploadStatus('idle');
+    setVideoUploadError(null);
+  };
+
   const handleSimulateGeminiProcessing = () => {
     if (!videoTitle.trim()) {
       showToast('Please enter a lesson title before generating Gemini summary.');
@@ -443,19 +524,178 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // --------------------------------------------------------------------------
-  // STATE: Tests
+  // STATE: Tests (Priority 3: Configurable Question Count & Management)
   // --------------------------------------------------------------------------
   const [testTitle, setTestTitle] = useState('');
   const [testInstructions, setTestInstructions] = useState('');
   const [testPassingScore, setTestPassingScore] = useState('70');
   const [testDuration, setTestDuration] = useState('30');
-  const [testQ1, setTestQ1] = useState('What is the maximum GPIO operating voltage of an ESP32?');
-  const [testQ1Opt, setTestQ1Opt] = useState('3.3V, 5.0V, 1.8V, 12V');
-  const [testQ1Ans, setTestQ1Ans] = useState('3.3V');
+  const [testConfiguredCount, setTestConfiguredCount] = useState<number>(5);
+  const [testQuestions, setTestQuestions] = useState<
+    Array<{
+      id: string;
+      question: string;
+      type: 'multiple_choice' | 'true_false' | 'short_answer';
+      options: string[];
+      correctAnswer: string;
+      points: number;
+      explanation: string;
+    }>
+  >([
+    {
+      id: 'q-1',
+      question: 'What is the maximum GPIO operating voltage of an ESP32?',
+      type: 'multiple_choice',
+      options: ['3.3V', '5.0V', '1.8V', '12V'],
+      correctAnswer: '3.3V',
+      points: 10,
+      explanation: 'ESP32 operates on 3.3V logic. Connecting 5V directly to GPIO can damage the chip.',
+    },
+    {
+      id: 'q-2',
+      question: 'Which serial protocol uses two lines (SDA and SCL) for communication?',
+      type: 'multiple_choice',
+      options: ['I2C', 'SPI', 'UART', 'CAN'],
+      correctAnswer: 'I2C',
+      points: 10,
+      explanation: 'I2C uses SDA (Serial Data) and SCL (Serial Clock).',
+    },
+    {
+      id: 'q-3',
+      question: 'The Raspberry Pi Pico RP2040 features a dual-core ARM Cortex-M0+ microcontroller.',
+      type: 'true_false',
+      options: ['True', 'False'],
+      correctAnswer: 'True',
+      points: 10,
+      explanation: 'RP2040 contains two 32-bit ARM Cortex-M0+ cores clocked at 133 MHz.',
+    },
+    {
+      id: 'q-4',
+      question: 'What standard baud rate is commonly used for Arduino Uno Serial communication?',
+      type: 'multiple_choice',
+      options: ['9600', '115200', '4800', '300'],
+      correctAnswer: '9600',
+      points: 10,
+      explanation: '9600 baud is the classic default for Arduino Uno sketches.',
+    },
+    {
+      id: 'q-5',
+      question: 'What function in Arduino C executes once at the start of the microcontroller boot cycle?',
+      type: 'multiple_choice',
+      options: ['setup()', 'loop()', 'main()', 'init()'],
+      correctAnswer: 'setup()',
+      points: 10,
+      explanation: 'setup() is called once when a sketch starts to initialize pin modes and serial ports.',
+    },
+  ]);
+  const [testValidationError, setTestValidationError] = useState<string | null>(null);
+  const [testPreviewOpen, setTestPreviewOpen] = useState<boolean>(false);
+
+  const handleAddQuestion = () => {
+    const newQ = {
+      id: `q-${Date.now()}-${testQuestions.length + 1}`,
+      question: `Question ${testQuestions.length + 1}: `,
+      type: 'multiple_choice' as const,
+      options: ['Option A', 'Option B', 'Option C', 'Option D'],
+      correctAnswer: 'Option A',
+      points: 10,
+      explanation: '',
+    };
+    setTestQuestions([...testQuestions, newQ]);
+  };
+
+  const handleRemoveQuestion = (id: string) => {
+    setTestQuestions(testQuestions.filter((q) => q.id !== id));
+  };
+
+  const handleUpdateQuestion = (id: string, patch: any) => {
+    setTestQuestions(testQuestions.map((q) => (q.id === id ? { ...q, ...patch } : q)));
+  };
+
+  const handleMoveQuestionUp = (index: number) => {
+    if (index <= 0) return;
+    setTestQuestions((prev) => {
+      const copy = [...prev];
+      const temp = copy[index - 1];
+      copy[index - 1] = copy[index];
+      copy[index] = temp;
+      return copy;
+    });
+  };
+
+  const handleMoveQuestionDown = (index: number) => {
+    if (index >= testQuestions.length - 1) return;
+    setTestQuestions((prev) => {
+      const copy = [...prev];
+      const temp = copy[index + 1];
+      copy[index + 1] = copy[index];
+      copy[index] = temp;
+      return copy;
+    });
+  };
+
+  const handleSyncToTargetCount = () => {
+    if (testQuestions.length === testConfiguredCount) return;
+    if (testQuestions.length < testConfiguredCount) {
+      const diff = testConfiguredCount - testQuestions.length;
+      const additional: typeof testQuestions = [];
+      for (let i = 0; i < diff; i++) {
+        const num = testQuestions.length + i + 1;
+        additional.push({
+          id: `q-${Date.now()}-${num}`,
+          question: `Question ${num}: `,
+          type: 'multiple_choice',
+          options: ['Option A', 'Option B', 'Option C', 'Option D'],
+          correctAnswer: 'Option A',
+          points: 10,
+          explanation: '',
+        });
+      }
+      setTestQuestions([...testQuestions, ...additional]);
+      showToast(`Added ${diff} question(s) to match configured count (${testConfiguredCount}).`);
+    } else {
+      setTestQuestions(testQuestions.slice(0, testConfiguredCount));
+      showToast(`Trimmed questions to match configured count (${testConfiguredCount}).`);
+    }
+  };
 
   const handleCreateTestSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!testTitle.trim()) return;
+    setTestValidationError(null);
+
+    if (!testTitle.trim()) {
+      setTestValidationError('Please specify a title for the examination.');
+      return;
+    }
+
+    if (testQuestions.length === 0) {
+      setTestValidationError('A test must contain at least one question.');
+      return;
+    }
+
+    if (testQuestions.length !== testConfiguredCount) {
+      setTestValidationError(
+        `Configured question count (${testConfiguredCount}) does not match saved questions (${testQuestions.length}). Please adjust the question count or add/remove questions to match.`
+      );
+      return;
+    }
+
+    // Validate that every question has question text and a valid correct answer
+    for (let i = 0; i < testQuestions.length; i++) {
+      const q = testQuestions[i];
+      if (!q.question.trim()) {
+        setTestValidationError(`Question #${i + 1} is missing question text.`);
+        return;
+      }
+      if ((q.type === 'multiple_choice' || q.type === 'true_false') && (!q.options || q.options.length < 2)) {
+        setTestValidationError(`Question #${i + 1} must have at least 2 answer options.`);
+        return;
+      }
+      if (!q.correctAnswer.trim()) {
+        setTestValidationError(`Question #${i + 1} is missing the correct answer.`);
+        return;
+      }
+    }
 
     createTest({
       courseId: selectedCourseForVideo || courses[0]?.id || 'course-elec-101',
@@ -465,22 +705,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       durationMinutes: parseInt(testDuration, 10) || 30,
       passingScore: parseInt(testPassingScore, 10) || 70,
       isPublished: true,
-      questions: [
-        {
-          id: `q-${Date.now()}-1`,
-          type: 'multiple_choice',
-          question: testQ1,
-          options: testQ1Opt.split(',').map((s) => s.trim()),
-          correctAnswer: testQ1Ans.trim(),
-          explanation: 'Standard ESP32 pins are rated for 3.3V logic levels.',
-          points: 10,
-        },
-      ],
+      questions: testQuestions.map((q, idx) => ({
+        id: q.id || `q-${idx + 1}`,
+        type: q.type,
+        question: q.question.trim(),
+        options: q.options,
+        correctAnswer: q.correctAnswer.trim(),
+        explanation: q.explanation || 'Refer to curriculum lecture notes.',
+        points: q.points || 10,
+      })),
     });
 
     setTestTitle('');
     setTestInstructions('');
-    showToast('Examination test created and published to students!');
+    showToast(`Test "${testTitle}" with all ${testQuestions.length} questions published to students!`);
   };
 
   // --------------------------------------------------------------------------
@@ -1016,17 +1254,130 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">
-                  Video Stream / File URL
-                </label>
-                <input
-                  type="text"
-                  value={videoUrl}
-                  onChange={(e) => setVideoUrl(e.target.value)}
-                  placeholder="https://assets.mixkit.co/videos/preview/mixkit-circuit-board-microchip-in-close-up-view-41584-large.mp4"
-                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-2 text-xs sm:text-sm text-[var(--foreground)] font-mono text-[11px]"
-                />
+              {/* Priority 2: Direct Video Upload from Device File Explorer */}
+              <div className="space-y-2 p-3.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-xs">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[var(--foreground)]">
+                    Lesson Video (Upload from Device)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowManualUrl(!showManualUrl)}
+                    className="text-[11px] text-[var(--muted-text)] hover:text-[var(--foreground)] underline cursor-pointer"
+                  >
+                    {showManualUrl ? 'Hide URL Alternative' : 'Or Paste URL'}
+                  </button>
+                </div>
+
+                {/* File Explorer Picker */}
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="px-3.5 py-2 rounded-lg bg-[var(--foreground)] hover:opacity-90 text-[var(--background)] text-xs font-semibold cursor-pointer transition flex items-center gap-1.5 shadow-xs">
+                      <FolderOpen className="w-3.5 h-3.5" />
+                      <span>Choose Video File</span>
+                      <input
+                        type="file"
+                        accept="video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,.mp4,.webm,.mov,.mkv"
+                        onChange={handleVideoFileChange}
+                        className="hidden"
+                      />
+                    </label>
+
+                    {videoFile && videoUploadStatus !== 'uploading' && videoUploadStatus !== 'success' && (
+                      <button
+                        type="button"
+                        onClick={handleUploadVideoFile}
+                        className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold cursor-pointer transition flex items-center gap-1.5 shadow-xs"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Upload Video</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Selected Video Details & Progress */}
+                  {videoFile && (
+                    <div className="p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <span className="font-semibold text-[var(--foreground)] block truncate max-w-xs sm:max-w-md">
+                            {videoFile.name}
+                          </span>
+                          <span className="text-[10px] text-[var(--muted-text)] font-mono">
+                            {(videoFile.size / (1024 * 1024)).toFixed(2)} MB • {videoFile.type || 'video/mp4'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {videoUploadStatus === 'error' && (
+                            <button
+                              type="button"
+                              onClick={handleUploadVideoFile}
+                              className="text-[11px] text-rose-500 hover:underline cursor-pointer font-semibold"
+                            >
+                              Retry Upload
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={handleRemoveVideoFile}
+                            className="text-[11px] text-[var(--muted-text)] hover:text-rose-500 cursor-pointer"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Progress bar during upload */}
+                      {videoUploadStatus === 'uploading' && (
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-[10px] text-[var(--muted-text)] font-mono">
+                            <span>Uploading video stream...</span>
+                            <span>{videoUploadProgress}%</span>
+                          </div>
+                          <div className="w-full h-1.5 rounded-full bg-[var(--border)] overflow-hidden">
+                            <div
+                              className="h-full bg-cyan-500 transition-all duration-150"
+                              style={{ width: `${videoUploadProgress}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Success confirmation */}
+                      {videoUploadStatus === 'success' && (
+                        <div className="p-2 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[11px] flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                          <span>Video stored and ready for course streaming: <code className="font-mono text-[10px]">{videoUrl}</code></span>
+                        </div>
+                      )}
+
+                      {/* Failure message */}
+                      {videoUploadStatus === 'error' && videoUploadError && (
+                        <div className="p-2 rounded bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[11px] flex items-center gap-1.5">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>{videoUploadError}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Optional manual URL input (alternative workflow) */}
+                {showManualUrl && (
+                  <div className="pt-2 border-t border-[var(--border)]">
+                    <label className="block text-[11px] text-[var(--muted-text)] mb-1">
+                      Direct Video Stream URL (Optional fallback)
+                    </label>
+                    <input
+                      type="text"
+                      value={videoUrl}
+                      onChange={(e) => setVideoUrl(e.target.value)}
+                      placeholder="https://.../video.mp4"
+                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] px-3 py-1.5 text-xs text-[var(--foreground)] font-mono text-[11px]"
+                    />
+                  </div>
+                )}
               </div>
 
               <div>
@@ -1244,36 +1595,199 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               </div>
 
+              {/* Configurable Number of Questions */}
               <div>
-                <label className="block font-semibold text-[var(--foreground)] mb-1">Question 1</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-semibold text-[var(--foreground)]">Configured Question Count</label>
+                  <span className="text-[11px] font-mono text-[var(--muted-text)]">
+                    Saved: {testQuestions.length} / Target: {testConfiguredCount}
+                  </span>
+                </div>
                 <input
-                  type="text"
-                  value={testQ1}
-                  onChange={(e) => setTestQ1(e.target.value)}
-                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] p-2 text-[var(--foreground)] mb-1.5"
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={testConfiguredCount}
+                  onChange={(e) => setTestConfiguredCount(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] p-2 text-[var(--foreground)] font-mono"
                 />
-                <label className="block text-[11px] text-[var(--muted-text)] mb-1">Options (comma separated)</label>
-                <input
-                  type="text"
-                  value={testQ1Opt}
-                  onChange={(e) => setTestQ1Opt(e.target.value)}
-                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] p-2 text-[var(--foreground)] mb-1.5"
-                />
-                <label className="block text-[11px] text-[var(--muted-text)] mb-1">Correct Answer</label>
-                <input
-                  type="text"
-                  value={testQ1Ans}
-                  onChange={(e) => setTestQ1Ans(e.target.value)}
-                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] p-2 text-[var(--foreground)]"
-                />
+                <p className="text-[10px] text-[var(--muted-text)] mt-0.5">
+                  The published test will deliver exactly this configured number of questions to students.
+                </p>
               </div>
 
-              <button
-                type="submit"
-                className="w-full py-2 rounded-lg bg-[var(--foreground)] hover:opacity-90 text-[var(--background)] font-semibold transition cursor-pointer"
-              >
-                Publish Test
-              </button>
+              {/* Validation Error Message */}
+              {testValidationError && (
+                <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{testValidationError}</span>
+                </div>
+              )}
+
+              {/* Question Items List */}
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-[var(--foreground)]">Test Questions ({testQuestions.length})</span>
+                  <div className="flex items-center gap-2">
+                    {testQuestions.length !== testConfiguredCount && (
+                      <button
+                        type="button"
+                        onClick={handleSyncToTargetCount}
+                        className="px-2 py-1 rounded border border-cyan-500/30 bg-cyan-500/10 text-cyan-400 text-[11px] font-medium flex items-center gap-1 cursor-pointer hover:bg-cyan-500/20 transition"
+                      >
+                        <span>Match Target ({testConfiguredCount})</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleAddQuestion}
+                      className="px-2.5 py-1 rounded bg-[var(--foreground)] text-[var(--background)] text-[11px] font-semibold flex items-center gap-1 cursor-pointer hover:opacity-90 transition"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Add Question</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-3 max-h-[380px] overflow-y-auto overscroll-contain pr-1">
+                  {testQuestions.map((q, idx) => (
+                    <div
+                      key={q.id}
+                      className="p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-secondary)] space-y-2 text-xs"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-[var(--foreground)]">Question #{idx + 1}</span>
+                          <div className="flex items-center gap-0.5 ml-1">
+                            <button
+                              type="button"
+                              disabled={idx === 0}
+                              onClick={() => handleMoveQuestionUp(idx)}
+                              className="p-0.5 rounded text-[var(--muted-text)] hover:text-[var(--foreground)] disabled:opacity-20 cursor-pointer"
+                              title="Move Question Up"
+                            >
+                              <ArrowUp className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={idx === testQuestions.length - 1}
+                              onClick={() => handleMoveQuestionDown(idx)}
+                              className="p-0.5 rounded text-[var(--muted-text)] hover:text-[var(--foreground)] disabled:opacity-20 cursor-pointer"
+                              title="Move Question Down"
+                            >
+                              <ArrowDown className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={q.type}
+                            onChange={(e) => handleUpdateQuestion(q.id, { type: e.target.value })}
+                            className="rounded border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[10px] text-[var(--foreground)]"
+                          >
+                            <option value="multiple_choice">Multiple Choice</option>
+                            <option value="true_false">True / False</option>
+                            <option value="short_answer">Short Answer</option>
+                          </select>
+                          {testQuestions.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveQuestion(q.id)}
+                              className="text-[11px] text-rose-500 hover:underline cursor-pointer"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <input
+                          type="text"
+                          value={q.question}
+                          onChange={(e) => handleUpdateQuestion(q.id, { question: e.target.value })}
+                          placeholder="Question text..."
+                          className="w-full rounded border border-[var(--border)] bg-[var(--surface)] p-1.5 text-xs text-[var(--foreground)]"
+                        />
+                      </div>
+
+                      {q.type === 'multiple_choice' && (
+                        <div>
+                          <label className="block text-[10px] text-[var(--muted-text)] mb-0.5">
+                            Options (comma-separated, min 2)
+                          </label>
+                          <input
+                            type="text"
+                            value={q.options.join(', ')}
+                            onChange={(e) =>
+                              handleUpdateQuestion(q.id, {
+                                options: e.target.value.split(',').map((s) => s.trim()),
+                              })
+                            }
+                            placeholder="Option A, Option B, Option C, Option D"
+                            className="w-full rounded border border-[var(--border)] bg-[var(--surface)] p-1.5 text-xs text-[var(--foreground)]"
+                          />
+                        </div>
+                      )}
+
+                      {q.type === 'true_false' && (
+                        <div className="text-[10px] text-[var(--muted-text)]">
+                          Options: <span className="font-mono text-[var(--foreground)]">True, False</span>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] text-[var(--muted-text)] mb-0.5">Correct Answer</label>
+                          <input
+                            type="text"
+                            value={q.correctAnswer}
+                            onChange={(e) => handleUpdateQuestion(q.id, { correctAnswer: e.target.value })}
+                            placeholder="Exact correct answer"
+                            className="w-full rounded border border-[var(--border)] bg-[var(--surface)] p-1.5 text-xs text-[var(--foreground)]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-[var(--muted-text)] mb-0.5">Marks</label>
+                          <input
+                            type="number"
+                            value={q.points}
+                            onChange={(e) => handleUpdateQuestion(q.id, { points: parseInt(e.target.value, 10) || 10 })}
+                            className="w-full rounded border border-[var(--border)] bg-[var(--surface)] p-1.5 text-xs text-[var(--foreground)]"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <input
+                          type="text"
+                          value={q.explanation}
+                          onChange={(e) => handleUpdateQuestion(q.id, { explanation: e.target.value })}
+                          placeholder="Optional explanation / reference..."
+                          className="w-full rounded border border-[var(--border)] bg-[var(--surface)] p-1.5 text-[11px] text-[var(--muted-text)]"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTestPreviewOpen(true)}
+                  className="flex-1 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-secondary)] text-[var(--foreground)] font-semibold transition cursor-pointer text-xs"
+                >
+                  Preview Test ({testQuestions.length} Qs)
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 rounded-lg bg-[var(--foreground)] hover:opacity-90 text-[var(--background)] font-semibold transition cursor-pointer text-xs shadow-xs"
+                >
+                  Publish Complete Test
+                </button>
+              </div>
             </form>
           </div>
 
@@ -2422,6 +2936,153 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ---------------------------------------------------- */}
+      {/* MODAL: TEST PREVIEW (Priority 3) */}
+      {/* ---------------------------------------------------- */}
+      {testPreviewOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs">
+          <div className="relative w-full max-w-3xl max-h-[90vh] rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl flex flex-col overflow-hidden text-[var(--foreground)]">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border)] shrink-0">
+              <div className="space-y-0.5">
+                <span className="text-[10px] uppercase font-bold text-cyan-500 tracking-wider">
+                  Test Examination Preview
+                </span>
+                <h3 className="text-base sm:text-lg font-bold text-[var(--foreground)]">
+                  {testTitle.trim() || 'Untitled Examination Test'}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTestPreviewOpen(false)}
+                className="p-1 rounded-lg text-[var(--muted-text)] hover:text-[var(--foreground)] hover:bg-[var(--surface-secondary)] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Meta summary badges */}
+            <div className="py-3 shrink-0 flex flex-wrap items-center gap-2 border-b border-[var(--border)] text-xs">
+              <span className="px-2.5 py-1 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] font-mono font-medium">
+                Target Questions: <strong className="text-[var(--foreground)]">{testConfiguredCount}</strong>
+              </span>
+              <span className="px-2.5 py-1 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] font-mono font-medium">
+                Saved Questions: <strong className="text-[var(--foreground)]">{testQuestions.length}</strong>
+              </span>
+              <span className="px-2.5 py-1 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] font-mono font-medium">
+                Duration: <strong className="text-[var(--foreground)]">{testDuration} mins</strong>
+              </span>
+              <span className="px-2.5 py-1 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] font-mono font-medium">
+                Pass Criterion: <strong className="text-emerald-500">{testPassingScore}%</strong>
+              </span>
+              <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 font-mono font-medium">
+                Total Marks: <strong>{testQuestions.reduce((acc, q) => acc + (q.points || 10), 0)} pts</strong>
+              </span>
+            </div>
+
+            {testQuestions.length !== testConfiguredCount && (
+              <div className="mt-3 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs flex items-center gap-2 shrink-0">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>
+                  Configured count is {testConfiguredCount}, but test currently contains {testQuestions.length} question(s). Adjust question list before publishing.
+                </span>
+              </div>
+            )}
+
+            {/* Scrollable Questions Preview List */}
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain py-4 space-y-4 pr-1">
+              {testQuestions.length === 0 ? (
+                <div className="py-12 text-center text-[var(--muted-text)] text-xs">
+                  No questions added yet.
+                </div>
+              ) : (
+                testQuestions.map((q, idx) => (
+                  <div
+                    key={q.id}
+                    className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface-secondary)] space-y-3 text-xs"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2.5">
+                        <span className="w-6 h-6 rounded-md bg-[var(--foreground)] text-[var(--background)] font-bold text-xs flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <div>
+                          <h4 className="font-semibold text-sm text-[var(--foreground)] leading-snug">
+                            {q.question || '(Empty question text)'}
+                          </h4>
+                          <span className="text-[10px] text-[var(--muted-text)] capitalize mt-0.5 block">
+                            Type: {q.type.replace('_', ' ')} • Marks: {q.points || 10} pts
+                          </span>
+                        </div>
+                      </div>
+
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shrink-0 font-semibold">
+                        Correct: {q.correctAnswer}
+                      </span>
+                    </div>
+
+                    {/* Options list for Multiple Choice & True/False */}
+                    {(q.type === 'multiple_choice' || q.type === 'true_false') && q.options && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                        {q.options.map((opt, oIdx) => {
+                          const isCorrect =
+                            q.correctAnswer === opt ||
+                            q.correctAnswer === String(oIdx) ||
+                            (opt.toLowerCase() === q.correctAnswer.toLowerCase());
+
+                          return (
+                            <div
+                              key={oIdx}
+                              className={`p-2.5 rounded-lg border flex items-center gap-2 text-xs ${
+                                isCorrect
+                                  ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 font-medium'
+                                  : 'bg-[var(--surface)] border-[var(--border)] text-[var(--foreground)]'
+                              }`}
+                            >
+                              <span
+                                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                                  isCorrect
+                                    ? 'bg-emerald-500 text-white'
+                                    : 'bg-[var(--surface-secondary)] text-[var(--muted-text)] border border-[var(--border)]'
+                                }`}
+                              >
+                                {String.fromCharCode(65 + oIdx)}
+                              </span>
+                              <span className="truncate">{opt}</span>
+                              {isCorrect && (
+                                <span className="ml-auto text-[10px] text-emerald-500 font-semibold">✓ Correct</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {q.explanation && (
+                      <div className="p-2.5 rounded-lg bg-[var(--surface)] border border-[var(--border)] text-[11px] text-[var(--muted-text)]">
+                        <strong className="text-[var(--foreground)] mr-1">Explanation:</strong>
+                        {q.explanation}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-3 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setTestPreviewOpen(false)}
+                className="px-4 py-2 rounded-lg border border-[var(--border)] hover:bg-[var(--surface-secondary)] text-xs font-semibold text-[var(--foreground)] transition cursor-pointer"
+              >
+                Close Preview
+              </button>
+            </div>
           </div>
         </div>
       )}

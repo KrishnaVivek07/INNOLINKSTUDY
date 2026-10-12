@@ -437,17 +437,53 @@ export const LMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const getCourseProgress = (courseId: string): CourseProgress => {
     const studentUid = currentUser?.uid || 'student-demo';
     const found = progressRecords.find((p) => p.studentId === studentUid && p.courseId === courseId);
-    if (found) return found;
+    
+    // Also resolve passed tests for this course from testAttempts
+    const passedTestIds = Array.from(
+      new Set(
+        testAttempts
+          .filter((a) => a.studentId === studentUid && a.courseId === courseId && a.passed)
+          .map((a) => a.testId)
+      )
+    );
+
+    const courseLessons = lessons.filter((l) => l.courseId === courseId);
+    const courseTests = tests.filter((t) => t.courseId === courseId);
+    const totalItems = courseLessons.length + courseTests.length;
+
+    if (found) {
+      // Merge any newly passed tests that might not have been recorded in completedTests array
+      const allCompletedTests = Array.from(new Set([...(found.completedTests || []), ...passedTestIds]));
+      const completedLessons = found.completedLessons || [];
+      const calculatedPct = totalItems > 0 
+        ? Math.min(100, Math.round(((completedLessons.length + allCompletedTests.length) / totalItems) * 100))
+        : (completedLessons.length > 0 || allCompletedTests.length > 0 ? 100 : 0);
+
+      const effectivePercentage = Math.max(found.percentage || 0, calculatedPct);
+      const isCompleted = effectivePercentage >= 100;
+
+      return {
+        ...found,
+        completedTests: allCompletedTests,
+        percentage: effectivePercentage,
+        isCompleted: found.isCompleted || isCompleted,
+      };
+    }
+
+    const initialCompletedTests = passedTestIds;
+    const initialPct = totalItems > 0
+      ? Math.min(100, Math.round((initialCompletedTests.length / totalItems) * 100))
+      : 0;
 
     return {
       id: `prog-${Date.now()}`,
       studentId: studentUid,
       courseId,
       completedLessons: [],
-      completedTests: [],
+      completedTests: initialCompletedTests,
       completedAssignments: [],
-      percentage: 0,
-      isCompleted: false,
+      percentage: initialPct,
+      isCompleted: initialPct >= 100,
       lastAccessedAt: new Date().toISOString(),
     };
   };

@@ -4,16 +4,80 @@ import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import crypto from 'crypto';
+import { spawn } from 'child_process';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json());
+
+// ----------------------------------------------------
+// Security Headers & Dotfile Protection Middleware
+// ----------------------------------------------------
+app.use((req, res, next) => {
+  // Prevent path traversal and protect dotfiles (e.g. .env, .owner_secure_credentials.json)
+  const decodedPath = decodeURIComponent(req.path);
+  if (/(^\/|\/)\.[a-zA-Z0-9_-]/.test(decodedPath)) {
+    return res.status(403).json({ error: 'Access denied: protected system resource.' });
+  }
+
+  // Production Security Headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+
+  // Prevent caching of sensitive API responses
+  if (req.path.startsWith('/api/')) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+
+  next();
+});
+
+// ----------------------------------------------------
+// In-Memory Rate Limiter Middleware for High-Risk Endpoints
+// ----------------------------------------------------
+interface RateLimitRecord {
+  count: number;
+  resetAt: number;
+}
+const rateLimitBuckets = new Map<string, RateLimitRecord>();
+
+function createRateLimiter(windowMs: number, maxRequests: number, message = 'Too many requests. Please try again later.') {
+  return (req: Request, res: Response, next: () => void) => {
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    const key = `${req.path}:${ip}`;
+    const now = Date.now();
+    const record = rateLimitBuckets.get(key);
+
+    if (!record || now > record.resetAt) {
+      rateLimitBuckets.set(key, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+
+    if (record.count >= maxRequests) {
+      const waitSeconds = Math.ceil((record.resetAt - now) / 1000);
+      res.setHeader('Retry-After', waitSeconds);
+      return res.status(429).json({ error: `${message} Try again in ${waitSeconds}s.` });
+    }
+
+    record.count += 1;
+    next();
+  };
+}
+
+const authRateLimiter = createRateLimiter(15 * 60 * 1000, 10, 'Too many verification requests.');
+const ownerLoginRateLimiter = createRateLimiter(15 * 60 * 1000, 10, 'Too many login attempts. Account temporarily locked.');
+const codeExecRateLimiter = createRateLimiter(60 * 1000, 30, 'Code execution rate limit reached.');
 
 // In-memory secure OTP store: email -> { otp, expiresAt, verified, name }
 interface PendingOTP {
@@ -141,7 +205,7 @@ export async function sendEmailJSNotification(
 // ----------------------------------------------------
 // 1. Auth & OTP Verification Endpoints
 // ----------------------------------------------------
-app.post('/api/auth/send-verification-otp', async (req: Request, res: Response) => {
+app.post('/api/auth/send-verification-otp', authRateLimiter, async (req: Request, res: Response) => {
   try {
     const { email, name } = req.body;
     if (!email || typeof email !== 'string') {
@@ -206,7 +270,7 @@ app.post('/api/auth/send-verification-otp', async (req: Request, res: Response) 
   }
 });
 
-app.post('/api/auth/verify-otp', (req: Request, res: Response) => {
+app.post('/api/auth/verify-otp', authRateLimiter, (req: Request, res: Response) => {
   try {
     const { email, otp } = req.body;
     if (!email || !otp) {
@@ -320,7 +384,7 @@ app.get('/api/owner/canonical-info', (_req: Request, res: Response) => {
 });
 
 // EXACTLY ONE Owner Portal Login (normalized: trim, case-insensitive)
-app.post('/api/owner/login', (req: Request, res: Response) => {
+app.post('/api/owner/login', ownerLoginRateLimiter, (req: Request, res: Response) => {
   try {
     const { identifier, password } = req.body;
     if (!identifier || !password) {
@@ -335,7 +399,9 @@ app.post('/api/owner/login', (req: Request, res: Response) => {
       cleanId === 'kkscreative' ||
       cleanId === 'kkscreative@innolink.tech' ||
       cleanId === 'owner' ||
+      cleanId === 'admin' ||
       cleanId === 'kks' ||
+      cleanId === 'kks creative' ||
       cleanId === OWNER_NOTIFICATION_EMAIL.toLowerCase();
 
     if (!isRecognizedId) {
@@ -2254,10 +2320,264 @@ Format output as JSON list of questions with:
 });
 
 // ----------------------------------------------------
+// General Code Execution Engine (C, C++, Python, Java)
+// ----------------------------------------------------
+interface ExecResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  timedOut?: boolean;
+}
+
+function executeProcess(
+  cmd: string,
+  args: string[],
+  options: { cwd: string; timeoutMs?: number },
+  stdinData: string = ''
+): Promise<ExecResult> {
+  return new Promise((resolve) => {
+    const timeoutMs = options.timeoutMs || 8000;
+    let stdout = '';
+    let stderr = '';
+    let isDone = false;
+
+    const proc = spawn(cmd, args, { cwd: options.cwd });
+
+    const timer = setTimeout(() => {
+      if (!isDone) {
+        isDone = true;
+        try {
+          proc.kill('SIGKILL');
+        } catch {}
+        resolve({
+          stdout,
+          stderr: stderr + '\n[Execution Timed Out: exceeded execution limit]',
+          exitCode: -1,
+          timedOut: true,
+        });
+      }
+    }, timeoutMs);
+
+    if (proc.stdin) {
+      if (stdinData) {
+        try {
+          proc.stdin.write(stdinData);
+        } catch {}
+      }
+      try {
+        proc.stdin.end();
+      } catch {}
+    }
+
+    proc.stdout?.on('data', (data) => {
+      stdout += data.toString();
+      if (stdout.length > 60000) {
+        try {
+          proc.kill('SIGKILL');
+        } catch {}
+      }
+    });
+
+    proc.stderr?.on('data', (data) => {
+      stderr += data.toString();
+      if (stderr.length > 60000) {
+        try {
+          proc.kill('SIGKILL');
+        } catch {}
+      }
+    });
+
+    proc.on('close', (code) => {
+      if (!isDone) {
+        isDone = true;
+        clearTimeout(timer);
+        resolve({ stdout, stderr, exitCode: code });
+      }
+    });
+
+    proc.on('error', (err) => {
+      if (!isDone) {
+        isDone = true;
+        clearTimeout(timer);
+        resolve({ stdout, stderr: stderr ? `${stderr}\n${err.message}` : err.message, exitCode: -1 });
+      }
+    });
+  });
+}
+
+app.post('/api/execute-code', codeExecRateLimiter, async (req: Request, res: Response) => {
+  const { language, code, input = '', timeLimitMs = 8000 } = req.body;
+
+  if (!code || typeof code !== 'string') {
+    return res.status(400).json({ error: 'Source code is required for execution.' });
+  }
+
+  const lang = (language || 'python').toLowerCase();
+  const execId = crypto.randomBytes(6).toString('hex');
+  const tempDir = path.join(os.tmpdir(), `innolink_exec_${execId}`);
+
+  try {
+    fs.mkdirSync(tempDir, { recursive: true });
+    const startTime = Date.now();
+
+    if (lang === 'c') {
+      const srcFile = path.join(tempDir, 'solution.c');
+      const binFile = path.join(tempDir, 'solution.out');
+      fs.writeFileSync(srcFile, code, 'utf-8');
+
+      // Compile with GCC
+      const compileRes = await executeProcess('gcc', ['-O2', 'solution.c', '-o', 'solution.out', '-lm'], { cwd: tempDir, timeoutMs: 10000 });
+      if (compileRes.exitCode !== 0) {
+        return res.json({
+          success: false,
+          compilationError: compileRes.stderr || 'Compilation failed with unknown error.',
+          stdout: '',
+          stderr: compileRes.stderr,
+          executionTimeMs: Date.now() - startTime,
+        });
+      }
+
+      // Execute binary
+      const runRes = await executeProcess('./solution.out', [], { cwd: tempDir, timeoutMs: timeLimitMs }, input);
+      return res.json({
+        success: runRes.exitCode === 0,
+        stdout: runRes.stdout,
+        stderr: runRes.stderr,
+        executionTimeMs: Date.now() - startTime,
+      });
+    } else if (lang === 'cpp' || lang === 'c_cpp') {
+      const srcFile = path.join(tempDir, 'solution.cpp');
+      const binFile = path.join(tempDir, 'solution.out');
+      fs.writeFileSync(srcFile, code, 'utf-8');
+
+      // Compile with G++
+      const compileRes = await executeProcess('g++', ['-O2', '-std=c++17', 'solution.cpp', '-o', 'solution.out', '-lm'], { cwd: tempDir, timeoutMs: 10000 });
+      if (compileRes.exitCode !== 0) {
+        return res.json({
+          success: false,
+          compilationError: compileRes.stderr || 'Compilation failed with unknown error.',
+          stdout: '',
+          stderr: compileRes.stderr,
+          executionTimeMs: Date.now() - startTime,
+        });
+      }
+
+      // Execute binary
+      const runRes = await executeProcess('./solution.out', [], { cwd: tempDir, timeoutMs: timeLimitMs }, input);
+      return res.json({
+        success: runRes.exitCode === 0,
+        stdout: runRes.stdout,
+        stderr: runRes.stderr,
+        executionTimeMs: Date.now() - startTime,
+      });
+    } else if (lang === 'python' || lang === 'micropython') {
+      const srcFile = path.join(tempDir, 'solution.py');
+      fs.writeFileSync(srcFile, code, 'utf-8');
+
+      // Execute with Python 3 unbuffered
+      const runRes = await executeProcess('python3', ['-u', 'solution.py'], { cwd: tempDir, timeoutMs: timeLimitMs }, input);
+      return res.json({
+        success: runRes.exitCode === 0,
+        stdout: runRes.stdout,
+        stderr: runRes.stderr,
+        executionTimeMs: Date.now() - startTime,
+      });
+    } else if (lang === 'java') {
+      // Find public class name or default to Main
+      const match = code.match(/public\s+class\s+([A-Za-z0-9_]+)/);
+      const className = match ? match[1] : 'Main';
+      let javaCode = code;
+      if (!match && !code.includes('class Main')) {
+        javaCode = `public class Main {\n${code}\n}`;
+      }
+
+      const srcFile = path.join(tempDir, `${className}.java`);
+      fs.writeFileSync(srcFile, javaCode, 'utf-8');
+
+      // Compile with javac
+      const compileRes = await executeProcess('javac', [`${className}.java`], { cwd: tempDir, timeoutMs: 12000 });
+      if (compileRes.exitCode !== 0) {
+        return res.json({
+          success: false,
+          compilationError: compileRes.stderr || 'Java compilation failed.',
+          stdout: '',
+          stderr: compileRes.stderr,
+          executionTimeMs: Date.now() - startTime,
+        });
+      }
+
+      // Run with java
+      const runRes = await executeProcess('java', [className], { cwd: tempDir, timeoutMs: timeLimitMs }, input);
+      return res.json({
+        success: runRes.exitCode === 0,
+        stdout: runRes.stdout,
+        stderr: runRes.stderr,
+        executionTimeMs: Date.now() - startTime,
+      });
+    } else {
+      return res.status(400).json({ error: `Execution service not configured for language: ${lang}` });
+    }
+  } catch (error: any) {
+    return res.status(500).json({ error: `Execution error: ${error?.message || error}` });
+  } finally {
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch {}
+  }
+});
+
+// ----------------------------------------------------
+// Video Upload & Streaming Storage Engine
+// ----------------------------------------------------
+const uploadsDir = path.resolve(process.cwd(), 'uploads', 'videos');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use('/uploads/videos', express.static(uploadsDir));
+
+app.post('/api/upload-video', (req: Request, res: Response) => {
+  try {
+    const rawFilename = (req.headers['x-filename'] as string) || `video_${Date.now()}.mp4`;
+    const cleanFilename = path.basename(decodeURIComponent(rawFilename)).replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const mimeType = (req.headers['content-type'] as string) || 'video/mp4';
+
+    const videoId = crypto.randomBytes(6).toString('hex');
+    const safeName = `${videoId}_${cleanFilename}`;
+    const targetPath = path.join(uploadsDir, safeName);
+
+    const fileStream = fs.createWriteStream(targetPath);
+
+    req.pipe(fileStream);
+
+    fileStream.on('finish', () => {
+      const stats = fs.statSync(targetPath);
+      return res.json({
+        success: true,
+        url: `/uploads/videos/${safeName}`,
+        fileName: cleanFilename,
+        fileSize: stats.size,
+        mimeType,
+      });
+    });
+
+    fileStream.on('error', (err) => {
+      return res.status(500).json({ error: `File write error: ${err.message}` });
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: `Upload failed: ${err?.message || err}` });
+  }
+});
+
+// ----------------------------------------------------
 // 4. Vite Dev Server & Static Asset Serving
 // ----------------------------------------------------
 async function startServer() {
-  const isProd = process.env.NODE_ENV === 'production';
+  const distPath = path.resolve(process.cwd(), 'dist');
+  const distExists = fs.existsSync(path.resolve(distPath, 'index.html'));
+  const isProd =
+    process.env.NODE_ENV === 'production' ||
+    process.env.npm_lifecycle_event === 'start' ||
+    (distExists && process.env.npm_lifecycle_event !== 'dev');
 
   if (!isProd) {
     const vite = await createViteServer({
@@ -2280,15 +2600,22 @@ async function startServer() {
       }
     });
   } else {
-    const distPath = path.resolve(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (_req, res) => {
+    app.use('*', (req, res, next) => {
+      if (req.originalUrl.startsWith('/api')) {
+        return next();
+      }
       res.sendFile(path.resolve(distPath, 'index.html'));
     });
   }
 
+  // 404 for unhandled API requests
+  app.all('/api/*', (_req: Request, res: Response) => {
+    res.status(404).json({ error: 'API route not found' });
+  });
+
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`InnoLink Technologies LMS server running on http://0.0.0.0:${PORT}`);
+    console.log(`InnoLink Technologies LMS server running on http://0.0.0.0:${PORT} (Mode: ${isProd ? 'production' : 'development'})`);
   });
 }
 
